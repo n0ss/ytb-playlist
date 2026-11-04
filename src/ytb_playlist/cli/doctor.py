@@ -1,7 +1,6 @@
 """The `doctor` command: render the dependency report with Rich."""
 
 from datetime import date
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -9,19 +8,13 @@ from rich.table import Table
 from rich.text import Text
 
 from ytb_playlist import deps
-from ytb_playlist.cli import exit_codes
-from ytb_playlist.config import ConfigError, default_config_dir, load_config
+from ytb_playlist.cli import common, exit_codes
+from ytb_playlist.config import default_config_dir
 
 
 def doctor(ctx: typer.Context) -> None:
     """Check yt-dlp, ffmpeg, deno and the output folder."""
-    config_path: Path | None = ctx.obj
-    try:
-        config = load_config(config_path)
-    except ConfigError as error:
-        Console(stderr=True).print(Text(f"error: {error}", style="red"), soft_wrap=True)
-        raise typer.Exit(exit_codes.USAGE_ERROR) from error
-
+    config = common.load_config_or_exit(ctx)
     console = Console()
     report = deps.check(config, default_config_dir(), date.today())
 

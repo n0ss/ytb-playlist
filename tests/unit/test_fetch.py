@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from fakes import PLAYLIST_ID, FakeBackend, write_item
 
 from ytb_playlist.backends.base import (
     BackendError,
@@ -40,51 +41,10 @@ from ytb_playlist.naming import UnsafeIdError
 from ytb_playlist.urls import UnsupportedUrlError
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
-PLAYLIST_ID = "PLtest"
 URL = f"https://www.youtube.com/playlist?list={PLAYLIST_ID}&si=tracking"
 TODAY = date(2026, 11, 4)
 GONE = DownloadError("b", FailureKind.PERMANENT, "This video is unavailable")
 FLAKY = DownloadError("b", FailureKind.TEMPORARY, "timeout")
-
-
-def write_item(work: Path, video_id: str, ext: str = "mp3") -> Path:
-    info = {"id": video_id, "title": f"Title {video_id}", "upload_date": "20241023"}
-    (work / f"{video_id}.info.json").write_text(json.dumps(info))
-    (work / f"{video_id}.jpg").write_bytes(b"jpeg")
-    media = work / f"{video_id}.{ext}"
-    media.write_bytes(b"media")
-    return media
-
-
-class FakeBackend:
-    """Behaves like yt-dlp for the engine: writes files, the archive and messages."""
-
-    def __init__(
-        self,
-        ids: tuple[str, ...] = ("a", "b", "c"),
-        outcomes: dict[str, list[DownloadMessage]] | None = None,
-        title: str = "My playlist",
-    ) -> None:
-        self.info = PlaylistInfo(PLAYLIST_ID, title, ids)
-        self.outcomes = outcomes or {}
-        self.requests: list[DownloadRequest] = []
-
-    def playlist_info(self, url: str) -> PlaylistInfo:
-        self.url = url
-        return self.info
-
-    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
-        self.requests.append(request)
-        for position in request.positions:
-            video_id = self.info.item_ids[position - 1]
-            if video_id in self.outcomes:
-                yield from self.outcomes[video_id]
-                continue
-            yield DownloadProgress(video_id, True, 10, 10)
-            media = write_item(request.work_dir, video_id, request.format)
-            yield DownloadSaved(video_id, media)
-            with request.archive.open("a") as archive:
-                archive.write(f"youtube {video_id}\n")
 
 
 class Run:

@@ -7,9 +7,13 @@ from typing import Annotated
 import typer
 
 from ytb_playlist.cli.doctor import doctor
+from ytb_playlist.cli.fetch import fetch_command
+from ytb_playlist.cli.info import info
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 app.command()(doctor)
+app.command()(info)
+app.command("fetch")(fetch_command)
 
 
 def show_version(value: bool) -> None:
