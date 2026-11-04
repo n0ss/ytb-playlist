@@ -1,6 +1,6 @@
 """The test seam between the engine and yt-dlp."""
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -51,4 +51,4 @@ DownloadMessage = DownloadProgress | DownloadSaved | DownloadError
 class Backend(Protocol):
     def playlist_info(self, url: str) -> PlaylistInfo: ...
 
-    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]: ...
+    def download(self, request: DownloadRequest) -> Generator[DownloadMessage]: ...

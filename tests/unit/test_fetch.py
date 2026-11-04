@@ -1,0 +1,528 @@
+import itertools
+import json
+from collections.abc import Iterator
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from ytb_playlist.backends.base import (
+    BackendError,
+    DownloadError,
+    DownloadMessage,
+    DownloadProgress,
+    DownloadRequest,
+    DownloadSaved,
+)
+from ytb_playlist.backends.ytdlp_proc import parse_line
+from ytb_playlist.core.fetch import FetchError, ItemsError, fetch, parse_items
+from ytb_playlist.core.models import (
+    Event,
+    FailureKind,
+    FetchDone,
+    FetchOptions,
+    FetchPlanned,
+    ItemFailed,
+    ItemProgress,
+    ItemSaved,
+    ItemStarted,
+    MediaFormat,
+    PlaylistInfo,
+)
+from ytb_playlist.core.state import (
+    FolderConflictError,
+    FormatChangeError,
+    PlaylistState,
+    load_state,
+    save_state,
+)
+from ytb_playlist.naming import UnsafeIdError
+from ytb_playlist.urls import UnsupportedUrlError
+
+FIXTURES = Path(__file__).parent.parent / "fixtures"
+PLAYLIST_ID = "PLtest"
+URL = f"https://www.youtube.com/playlist?list={PLAYLIST_ID}&si=tracking"
+TODAY = date(2026, 11, 4)
+GONE = DownloadError("b", FailureKind.PERMANENT, "This video is unavailable")
+FLAKY = DownloadError("b", FailureKind.TEMPORARY, "timeout")
+
+
+def write_item(work: Path, video_id: str, ext: str = "mp3") -> Path:
+    info = {"id": video_id, "title": f"Title {video_id}", "upload_date": "20241023"}
+    (work / f"{video_id}.info.json").write_text(json.dumps(info))
+    (work / f"{video_id}.jpg").write_bytes(b"jpeg")
+    media = work / f"{video_id}.{ext}"
+    media.write_bytes(b"media")
+    return media
+
+
+class FakeBackend:
+    """Behaves like yt-dlp for the engine: writes files, the archive and messages."""
+
+    def __init__(
+        self,
+        ids: tuple[str, ...] = ("a", "b", "c"),
+        outcomes: dict[str, list[DownloadMessage]] | None = None,
+        title: str = "My playlist",
+    ) -> None:
+        self.info = PlaylistInfo(PLAYLIST_ID, title, ids)
+        self.outcomes = outcomes or {}
+        self.requests: list[DownloadRequest] = []
+
+    def playlist_info(self, url: str) -> PlaylistInfo:
+        self.url = url
+        return self.info
+
+    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+        self.requests.append(request)
+        for position in request.positions:
+            video_id = self.info.item_ids[position - 1]
+            if video_id in self.outcomes:
+                yield from self.outcomes[video_id]
+                continue
+            yield DownloadProgress(video_id, True, 10, 10)
+            media = write_item(request.work_dir, video_id, request.format)
+            yield DownloadSaved(video_id, media)
+            with request.archive.open("a") as archive:
+                archive.write(f"youtube {video_id}\n")
+
+
+class Run:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.events: list[Event] = []
+
+    def __call__(self, backend: FakeBackend, **options: object) -> list[Event]:
+        self.events = []
+        values = {"format": MediaFormat.MP3, "output_root": self.root} | options
+        fetch(URL, FetchOptions(**values), backend, self.events.append, TODAY)
+        return self.events
+
+    @property
+    def folder(self) -> Path:
+        return self.root / f"My playlist [{PLAYLIST_ID}]"
+
+    def media(self) -> list[str]:
+        return sorted(p.name for p in self.folder.iterdir() if not p.name.startswith("."))
+
+
+@pytest.fixture
+def run(tmp_path: Path) -> Run:
+    return Run(tmp_path / "root")
+
+
+def of_type(events: list[Event], kind: type) -> list:
+    return [event for event in events if isinstance(event, kind)]
+
+
+def test_items_move_to_their_final_names(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    assert run.media() == ["2024-10-23 - Title a [a].mp3"]
+    assert (run.folder / "2024-10-23 - Title a [a].mp3").read_bytes() == b"media"
+
+
+def test_metadata_and_thumbnail_are_kept_for_tagging(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    state_dir = run.folder / ".ytb-playlist"
+    assert json.loads((state_dir / "a.info.json").read_text())["id"] == "a"
+    assert (state_dir / "thumbs" / "a.jpg").read_bytes() == b"jpeg"
+
+
+def test_work_folder_is_removed_after_a_clean_run(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    assert not (run.folder / ".ytb-playlist" / "tmp").exists()
+
+
+def test_url_is_normalised_before_use(run: Run) -> None:
+    backend = FakeBackend(("a",))
+    run(backend)
+    assert backend.url == f"https://www.youtube.com/playlist?list={PLAYLIST_ID}"
+
+
+def test_unsupported_url_stops_before_any_call(tmp_path: Path) -> None:
+    backend = FakeBackend()
+    options = FetchOptions(MediaFormat.MP3, tmp_path)
+    with pytest.raises(UnsupportedUrlError):
+        fetch("https://vimeo.com/1", options, backend, lambda _: None, TODAY)
+    assert backend.requests == []
+
+
+def test_events_describe_the_run(run: Run) -> None:
+    events = run(FakeBackend(("a", "b")))
+    assert events[0] == FetchPlanned(run.folder, 2, 0)
+    assert of_type(events, ItemStarted) == [ItemStarted("a"), ItemStarted("b")]
+    assert [event.video_id for event in of_type(events, ItemSaved)] == ["a", "b"]
+    assert events[-1] == FetchDone(saved=2, failed=0, skipped=0)
+
+
+def test_new_items_are_marked_untagged(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    assert load_state(run.folder).tagged == set()
+
+
+def test_rerun_downloads_nothing(run: Run) -> None:
+    run(FakeBackend())
+    backend = FakeBackend()
+    events = run(backend)
+    assert backend.requests == []
+    assert events[-1] == FetchDone(saved=0, failed=0, skipped=0)
+
+
+def test_only_new_items_are_requested_by_their_position(run: Run) -> None:
+    run(FakeBackend(("a", "c")))
+    backend = FakeBackend(("new", "a", "other", "c"))
+    run(backend)
+    assert backend.requests[0].positions == (1, 3)
+
+
+def test_renamed_playlist_reuses_its_folder(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    run(FakeBackend(("a", "b"), title="New name on YouTube"))
+    assert len(run.media()) == 2
+    assert [path.name for path in run.root.iterdir()] == [run.folder.name]
+
+
+def test_two_matching_folders_stop_the_run(run: Run) -> None:
+    (run.root / f"One [{PLAYLIST_ID}]").mkdir(parents=True)
+    (run.root / f"Two [{PLAYLIST_ID}]").mkdir()
+    backend = FakeBackend()
+    with pytest.raises(FolderConflictError):
+        run(backend)
+    assert backend.requests == []
+
+
+def test_format_change_is_refused_before_downloading(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    backend = FakeBackend(("a", "b"))
+    with pytest.raises(FormatChangeError):
+        run(backend, format=MediaFormat.MP4)
+    assert backend.requests == []
+
+
+def test_format_is_recorded_before_the_first_download_ends(run: Run) -> None:
+    class Interrupted(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            raise KeyboardInterrupt
+            yield
+
+    with pytest.raises(KeyboardInterrupt):
+        run(Interrupted(("a",)))
+    assert load_state(run.folder).format == MediaFormat.MP3
+
+
+def test_mp4_files_keep_their_extension(run: Run) -> None:
+    run(FakeBackend(("a",)), format=MediaFormat.MP4)
+    assert run.media() == ["2024-10-23 - Title a [a].mp4"]
+
+
+def test_permanent_failure_is_recorded_and_skipped_later(run: Run) -> None:
+    events = run(FakeBackend(outcomes={"b": [GONE]}))
+    assert of_type(events, ItemFailed) == [
+        ItemFailed("b", FailureKind.PERMANENT, "This video is unavailable")
+    ]
+    assert events[-1] == FetchDone(saved=2, failed=0, skipped=1)
+    saved = load_state(run.folder).failures["b"]
+    assert (saved.kind, saved.date) == (FailureKind.PERMANENT, "2026-11-04")
+
+    backend = FakeBackend()
+    events = run(backend)
+    assert backend.requests == []
+    assert events[-1] == FetchDone(saved=0, failed=0, skipped=1)
+
+
+def test_temporary_failure_counts_as_failed_and_is_retried(run: Run) -> None:
+    events = run(FakeBackend(("a", "b"), {"b": [FLAKY]}))
+    assert events[-1] == FetchDone(saved=1, failed=1, skipped=0)
+    backend = FakeBackend(("a", "b"))
+    run(backend)
+    assert backend.requests[0].positions == (2,)
+    assert load_state(run.folder).failures == {}
+
+
+def test_error_without_an_id_belongs_to_the_item_in_progress(run: Run) -> None:
+    message = DownloadError(None, FailureKind.TEMPORARY, "unable to download: HTTP Error 403")
+    backend = FakeBackend(("b",), {"b": [DownloadProgress("b", False, 1, 10), message]})
+    events = run(backend)
+    assert of_type(events, ItemFailed)[0].video_id == "b"
+    assert events[-1] == FetchDone(saved=0, failed=1, skipped=0)
+
+
+def test_error_about_the_playlist_stops_with_fetch_error(run: Run) -> None:
+    message = DownloadError(None, FailureKind.TEMPORARY, "HTTP Error 400")
+    with pytest.raises(FetchError, match="HTTP Error 400"):
+        run(FakeBackend(("b",), {"b": [message]}))
+
+
+def test_backend_error_keeps_what_was_already_saved(run: Run) -> None:
+    class Failing(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            yield from super().download(request)
+            raise BackendError("yt-dlp stopped with exit 2")
+
+    with pytest.raises(BackendError):
+        run(Failing(("a",)))
+    assert len(run.media()) == 1
+
+
+def test_interrupt_leaves_nothing_visible_and_keeps_partial_files(run: Run) -> None:
+    class Interrupted(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            (request.work_dir / "a.mp3.part").write_bytes(b"partial")
+            yield DownloadProgress("a", False, 1, 10)
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        run(Interrupted(("a",)))
+    assert run.media() == []
+    assert (run.folder / ".ytb-playlist" / "tmp" / "a.mp3.part").exists()
+
+
+def test_stopping_closes_the_download_stream(run: Run) -> None:
+    closed = []
+
+    class Tracking(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            def stream() -> Iterator[DownloadMessage]:
+                try:
+                    yield DownloadProgress("a", False, 1, 10)
+                finally:
+                    closed.append(True)
+
+            # Held here so only an explicit close can end it, not garbage collection.
+            self.stream = stream()
+            return self.stream
+
+    def stop(event: Event) -> None:
+        if isinstance(event, ItemStarted):
+            raise KeyboardInterrupt
+
+    options = FetchOptions(MediaFormat.MP3, run.root)
+    backend = Tracking(("a",))
+    with pytest.raises(KeyboardInterrupt):
+        fetch(URL, options, backend, stop, TODAY)
+    assert closed == [True]
+
+
+def test_finished_file_left_by_a_crash_is_recovered(run: Run) -> None:
+    work = run.folder / ".ytb-playlist" / "tmp"
+    work.mkdir(parents=True)
+    write_item(work, "a")
+    (work.parent / "archive.txt").write_text("youtube a\n")
+    backend = FakeBackend(("a",))
+    events = run(backend)
+    assert run.media() == ["2024-10-23 - Title a [a].mp3"]
+    assert backend.requests == []
+    assert events[-1] == FetchDone(saved=1, failed=0, skipped=0)
+
+
+def test_unfinished_file_is_not_recovered(run: Run) -> None:
+    work = run.folder / ".ytb-playlist" / "tmp"
+    work.mkdir(parents=True)
+    write_item(work, "a")
+    backend = FakeBackend(("a",))
+    run(backend)
+    assert backend.requests[0].positions == (1,)
+
+
+def test_existing_file_is_never_overwritten(run: Run) -> None:
+    run.folder.mkdir(parents=True)
+    target = run.folder / "2024-10-23 - Title a [a].mp3"
+    target.write_bytes(b"yours")
+    events = run(FakeBackend(("a",)))
+    assert target.read_bytes() == b"yours"
+    assert of_type(events, ItemSaved) == [ItemSaved("a", target)]
+
+
+def test_damaged_metadata_fails_the_item_and_keeps_the_file(run: Run) -> None:
+    class Damaged(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            media = write_item(request.work_dir, "a")
+            (request.work_dir / "a.info.json").write_text("{broken")
+            yield DownloadSaved("a", media)
+
+    events = run(Damaged(("a",)))
+    assert of_type(events, ItemFailed)[0].kind == FailureKind.TEMPORARY
+    assert events[-1] == FetchDone(saved=0, failed=1, skipped=0)
+    assert (run.folder / ".ytb-playlist" / "tmp" / "a.mp3").exists()
+
+
+def test_saved_path_outside_the_work_folder_is_refused(run: Run, tmp_path: Path) -> None:
+    outside = tmp_path / "secret.mp3"
+    outside.write_bytes(b"not ours")
+
+    class Escaping(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            write_item(request.work_dir, "a")
+            yield DownloadSaved("a", outside)
+
+    events = run(Escaping(("a",)))
+    assert outside.exists()
+    assert of_type(events, ItemFailed)[0].video_id == "a"
+    assert run.media() == []
+
+
+def test_metadata_for_another_item_is_refused(run: Run) -> None:
+    class Mismatched(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            media = write_item(request.work_dir, "a")
+            (request.work_dir / "a.info.json").write_text('{"id": "other", "title": "T"}')
+            yield DownloadSaved("a", media)
+
+    events = run(Mismatched(("a",)))
+    assert events[-1] == FetchDone(saved=0, failed=1, skipped=0)
+    assert run.media() == []
+
+
+def test_unsafe_id_in_a_saved_message_is_refused(run: Run) -> None:
+    backend = FakeBackend(("a",), {"a": [DownloadSaved("../evil", Path("/x/y.mp3"))]})
+    events = run(backend)
+    assert events[-1].failed == 1
+
+
+def test_unsafe_playlist_id_is_refused(tmp_path: Path) -> None:
+    backend = FakeBackend()
+    backend.info = PlaylistInfo("../evil", "T", ("a",))
+    with pytest.raises(UnsafeIdError):
+        fetch(URL, FetchOptions(MediaFormat.MP3, tmp_path), backend, lambda _: None, TODAY)
+
+
+def test_entries_without_an_id_are_not_requested(run: Run) -> None:
+    backend = FakeBackend(("a", "", "c"))
+    run(backend)
+    assert backend.requests[0].positions == (1, 3)
+
+
+def test_dry_run_reports_and_writes_nothing(run: Run) -> None:
+    backend = FakeBackend()
+    events = run(backend, dry_run=True)
+    assert events == [FetchPlanned(run.folder, 3, 0)]
+    assert backend.requests == []
+    assert not run.root.exists()
+
+
+def test_dry_run_leaves_a_crashed_file_alone(run: Run) -> None:
+    work = run.folder / ".ytb-playlist" / "tmp"
+    work.mkdir(parents=True)
+    media = write_item(work, "a")
+    (work.parent / "archive.txt").write_text("youtube a\n")
+    run(FakeBackend(("a",)), dry_run=True)
+    assert media.exists()
+
+
+def test_clip_reaches_the_backend(run: Run) -> None:
+    backend = FakeBackend(("a",))
+    run(backend, clip_seconds=60)
+    assert backend.requests[0].clip_seconds == 60
+
+
+def test_items_option_limits_the_positions(run: Run) -> None:
+    backend = FakeBackend()
+    run(backend, items="2:3")
+    assert backend.requests[0].positions == (2, 3)
+
+
+def test_items_past_the_end_is_an_explicit_empty_outcome(run: Run) -> None:
+    backend = FakeBackend()
+    events = run(backend, items="90:95")
+    assert backend.requests == []
+    assert events == [FetchPlanned(run.folder, 0, 0), FetchDone(0, 0, 0)]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (None, {1, 2, 3, 4, 5}),
+        ("2", {2}),
+        ("2:4", {2, 3, 4}),
+        ("1,3:4", {1, 3, 4}),
+        ("4:90", {4, 5}),
+        (" 1 , 2 ", {1, 2}),
+    ],
+)
+def test_parse_items(text: str | None, expected: set[int]) -> None:
+    assert parse_items(text, 5) == expected
+
+
+@pytest.mark.parametrize("text", ["", "a", "0", "3:1", "1:", ":2", "1:2:3", "-1"])
+def test_bad_items_are_refused(text: str) -> None:
+    with pytest.raises(ItemsError):
+        parse_items(text, 5)
+
+
+def test_recorded_two_stream_progress_restarts_for_each_stream(run: Run) -> None:
+    lines = (FIXTURES / "ytdlp-two-stream.log").read_text().splitlines()
+    messages = [message for line in lines if (message := parse_line(line))]
+
+    class Replay(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            for message in messages:
+                if isinstance(message, DownloadSaved):
+                    media = write_item(request.work_dir, "4oEFyaR6uiM", "mp4")
+                    yield DownloadSaved(message.video_id, media)
+                else:
+                    yield message
+
+    events = run(Replay(("4oEFyaR6uiM",)))
+    percents = [event.percent for event in of_type(events, ItemProgress)]
+    assert all(0 <= percent <= 100 for percent in percents)
+    drops = [pair for pair in itertools.pairwise(percents) if pair[1] < pair[0]]
+    assert len(drops) == 1
+    assert drops[0][0] == 100
+
+
+class Replaying(FakeBackend):
+    def __init__(self, messages: list[DownloadMessage]) -> None:
+        super().__init__(("a",))
+        self.messages = messages
+
+    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+        yield from self.messages
+
+
+def percents(run: Run, *messages: DownloadMessage) -> list[float]:
+    return [e.percent for e in of_type(run(Replaying(list(messages))), ItemProgress)]
+
+
+def test_progress_never_moves_backwards_within_a_stream(run: Run) -> None:
+    assert percents(
+        run,
+        DownloadProgress("a", False, 50, 100),
+        DownloadProgress("a", False, 50, 200),
+        DownloadProgress("a", False, 150, 200),
+    ) == [50, 50, 75]
+
+
+def test_size_equal_to_the_estimate_is_not_read_as_complete(run: Run) -> None:
+    assert percents(
+        run,
+        DownloadProgress("a", False, 1024, 1024),
+        DownloadProgress("a", False, 500, 1000),
+    ) == [50]
+
+
+def test_finished_stream_is_complete(run: Run) -> None:
+    assert percents(run, DownloadProgress("a", True, 10, 10)) == [100]
+
+
+def test_second_stream_starts_again_from_its_own_progress(run: Run) -> None:
+    assert percents(
+        run,
+        DownloadProgress("a", False, 90, 100),
+        DownloadProgress("a", True, 100, 100),
+        DownloadProgress("a", False, 10, 100),
+    ) == [90, 100, 10]
+
+
+def test_unknown_size_gives_no_percentage(run: Run) -> None:
+    class Unknown(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            yield DownloadProgress("a", False, 10, None)
+
+    assert of_type(run(Unknown(("a",))), ItemProgress) == []
+
+
+def test_state_from_an_earlier_run_is_kept(run: Run) -> None:
+    state = PlaylistState(PLAYLIST_ID, MediaFormat.MP3, tagged={"old"})
+    save_state(run.folder, state)
+    run(FakeBackend(("a",)))
+    assert load_state(run.folder).tagged == {"old"}

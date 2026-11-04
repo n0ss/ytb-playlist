@@ -8,7 +8,7 @@ another (decision 20), so failures are classified from the `ERROR:` text.
 import json
 import re
 import subprocess
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 
 from ytb_playlist.backends.base import (
@@ -168,7 +168,7 @@ class YtDlpBackend:
             raise BackendError(result.stderr.strip().rpartition("\n")[2] or "yt-dlp failed")
         return parse_playlist(result.stdout)
 
-    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+    def download(self, request: DownloadRequest) -> Generator[DownloadMessage]:
         saw_error = False
         try:
             process = subprocess.Popen(

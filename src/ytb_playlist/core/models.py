@@ -44,6 +44,13 @@ class FetchOptions:
 
 
 @dataclass(frozen=True)
+class FetchPlanned:
+    folder: Path
+    pending: int
+    skipped: int
+
+
+@dataclass(frozen=True)
 class ItemStarted:
     video_id: str
 
@@ -74,4 +81,4 @@ class FetchDone:
     skipped: int
 
 
-Event = ItemStarted | ItemProgress | ItemSaved | ItemFailed | FetchDone
+Event = FetchPlanned | ItemStarted | ItemProgress | ItemSaved | ItemFailed | FetchDone
