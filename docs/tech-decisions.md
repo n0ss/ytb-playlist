@@ -149,3 +149,9 @@
 - **`rename`:** works only on files with ` [<id>]` in the name and saved metadata, because nothing else has the data to name them correctly. It never overwrites. Old names go to `.ytb-playlist/rename-log.jsonl`, written before the rename; there is no undo command.
 - **Safe writes:** mutagen shifts audio data in place, so tags go onto an APFS clone beside the file (a plain copy on other disks), which then replaces it with an atomic rename.
 - **Verified:** `ytb-playlist` tagged a real full-length MP3 without downloading it again, and a clipped MP4 went through the whole engine (H.264 + AAC, 1280×720 cover, no media kind). This closes the MP4 limit in decision 24.
+
+## 28. 2026-11-04 — Saved playlists and full config
+- **Decision:** saved playlists live in a generated `playlists.toml` beside the config, not in `config.toml`. Each setting takes the CLI value, then the playlist's, then the file's or environment's, then the default. Unknown config keys are errors. `playlist remove` forgets the entry and leaves all files. `sync --all` carries on after a failure, and the worst exit code wins.
+- **Why:** Python can read TOML but not write it, so rewriting `config.toml` would lose comments. A typo in a config key should fail clearly rather than do nothing.
+- **Left out:** `config edit`, `-v`, `-q`, `--no-color` and `--cookies-from-browser`, until a real need appears. `--config` doesn't move `playlists.toml`, which stays in the default folder.
+- **Added:** `sync --dry-run`, because a first sync of a long playlist can mean many gigabytes.

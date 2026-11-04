@@ -31,7 +31,7 @@ def out(tmp_path: Path, home: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def use(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> FakeBackend:
     monkeypatch.setattr(common, "make_backend", lambda _config: backend)
-    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ())
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_a, **_k: ())
     return backend
 
 
@@ -154,7 +154,7 @@ def test_full_disk_exits_3(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_tagging_failure_exits_1(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     use(monkeypatch, FakeBackend(("a",)))
 
-    def fail(*_: object) -> tuple[str, ...]:
+    def fail(*_: object, **__: object) -> tuple[str, ...]:
         raise TaggingError("bad file")
 
     monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", fail)
@@ -165,7 +165,7 @@ def test_tagging_failure_exits_1(out: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_tagging_warning_is_shown(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     use(monkeypatch, FakeBackend(("a",)))
-    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ("no cover found",))
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_a, **_k: ("no cover found",))
     result = fetch_cli(out)
     assert result.exit_code == 0
     assert "no cover found" in result.output
@@ -174,12 +174,12 @@ def test_tagging_warning_is_shown(out: Path, monkeypatch: pytest.MonkeyPatch) ->
 def test_retagging_an_existing_file_is_reported(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     use(monkeypatch, FakeBackend(("a",)))
 
-    def fail(*_: object) -> tuple[str, ...]:
+    def fail(*_: object, **__: object) -> tuple[str, ...]:
         raise TaggingError("bad file")
 
     monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", fail)
     fetch_cli(out)
-    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ())
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_a, **_k: ())
     result = fetch_cli(out)
     assert result.exit_code == 0
     assert "tagged a" in result.output

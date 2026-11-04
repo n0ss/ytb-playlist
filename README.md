@@ -33,8 +33,10 @@ uv run ytb-playlist fetch URL --format mp3 --items 1:3 --dry-run
 uv run ytb-playlist tag PATH    # write tags and cover from the saved metadata
 uv run ytb-playlist cover PATH  # embed the saved thumbnail again
 uv run ytb-playlist rename PATH --dry-run
-```
-More commands arrive with phase 6. The planned interface is in `docs/plan.md`.
+uv run ytb-playlist playlist add URL --format mp3 --name Show
+uv run ytb-playlist sync Show --dry-run   # or: sync --all
+uv run ytb-playlist config show
+``` The planned interface is in `docs/plan.md`.
 
 ## Tests
 ```bash

@@ -13,3 +13,4 @@
 - Project licensed under the GNU GPL v3.0. See [decision 25](docs/tech-decisions.md).
 - Repository hosted publicly on GitHub, ahead of v0.1.0. See [decision 26](docs/tech-decisions.md).
 - Phase 5: tags and cover art during `fetch`, plus `tag`, `cover` and `rename`. See [decision 27](docs/tech-decisions.md).
+- Phase 6: saved playlists, `sync`, `--retry-failed`, full config and quality options. See [decision 28](docs/tech-decisions.md).

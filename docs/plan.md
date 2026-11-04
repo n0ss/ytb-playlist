@@ -50,17 +50,17 @@ ytb-playlist
 ├── doctor                     # check yt-dlp, ffmpeg, deno, versions, PATHs, write access
 ├── info    URL                # playlist title, id, count; no download
 ├── fetch   URL... --format mp3|mp4 [--out DIR] [--items 1:10] [--dry-run]
-├── sync    [NAME|--all] [--retry-failed]   # re-run saved playlists, download only new entries
+├── sync    [NAME|--all] [--retry-failed] [--dry-run]   # re-run saved playlists, download only new entries
 ├── playlist
-│   ├── add    URL --format mp3|mp4 [--name NAME]   # register in config
+│   ├── add    URL --format mp3|mp4 [--name NAME]   # register in playlists.toml
 │   ├── list
 │   └── remove NAME
 ├── tag     PATH... [--cover square|wide]               # (re)tag existing files
 ├── cover   PATH... [--cover square|wide]               # embed the saved thumbnail again
 ├── rename  PATH... [--dry-run]                         # apply naming convention to existing files
-└── config  show|path|edit
+└── config  show|path
 
-Global: --config FILE  -v/-q  --no-color  --version
+Global: --config FILE  --version
 ```
 
 | Concern | Choice |

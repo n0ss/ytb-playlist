@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The `fetch` command: run the engine and render its events with Rich."""
 
+from collections.abc import Mapping
 from datetime import date
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -11,8 +13,10 @@ from rich.text import Text
 
 from ytb_playlist.backends.base import Backend, BackendError
 from ytb_playlist.cli import common, exit_codes
+from ytb_playlist.config import Config
 from ytb_playlist.core.fetch import FetchError, ItemsError, fetch
 from ytb_playlist.core.models import (
+    CoverSource,
     Event,
     FailureKind,
     FetchDone,
@@ -25,6 +29,7 @@ from ytb_playlist.core.models import (
     ItemTagged,
     MediaFormat,
 )
+from ytb_playlist.core.playlists import PlaylistEntry, fetch_options
 from ytb_playlist.core.state import FolderConflictError, FormatChangeError, StateError
 from ytb_playlist.naming import UnsafeIdError
 from ytb_playlist.tagging.apply import tag_file
@@ -39,6 +44,10 @@ USAGE_ERRORS = (
     UnsafeIdError,
 )
 NETWORK_ERRORS = (BackendError, FetchError)
+
+
+class Quality(StrEnum):
+    MAX = "max"
 
 
 class _Renderer:
@@ -91,11 +100,18 @@ class _Renderer:
             self.task = None
 
 
-def _fetch_one(url: str, options: FetchOptions, backend: Backend) -> int:
+def run_fetch(
+    url: str, entry: PlaylistEntry, options: FetchOptions, config: Config, backend: Backend
+) -> int:
+    """Fetch one playlist and return its exit code, so the next one can still run."""
+
+    def tagger(path: Path, info: Mapping[str, object], thumbnail: Path | None) -> tuple[str, ...]:
+        return tag_file(path, info, thumbnail, album=entry.album, genre=entry.genre or config.genre)
+
     with Progress(transient=True) as progress:
         renderer = _Renderer(progress)
         try:
-            fetch(url, options, backend, tag_file, renderer, date.today())
+            fetch(url, options, backend, tagger, renderer, date.today())
         except USAGE_ERRORS as error:
             common.print_error(error)
             return exit_codes.USAGE_ERROR
@@ -115,12 +131,27 @@ def fetch_command(
     out: Annotated[Path | None, typer.Option(help="Folder that holds the playlists.")] = None,
     items: Annotated[str | None, typer.Option(help="Positions, such as 1:10 or 1,3:4.")] = None,
     dry_run: Annotated[bool, typer.Option(help="Report what's new; write nothing.")] = False,
+    cover: Annotated[CoverSource | None, typer.Option(help="Cover for each track.")] = None,
+    max_height: Annotated[int | None, typer.Option(min=1, help="Video height cap.")] = None,
+    quality: Annotated[
+        Quality | None, typer.Option(help="max also allows formats Apple apps may refuse.")
+    ] = None,
 ) -> None:
     """Download playlists into one folder each, skipping what's already there."""
     config = common.load_config_or_exit(ctx)
     backend = common.make_backend(config)
-    root = out.expanduser().absolute() if out else config.output_root
-    options = FetchOptions(media_format, root, items, dry_run)
-    worst = max(_fetch_one(url, options, backend) for url in urls)
+    root = out.expanduser().absolute() if out else None
+    entry = PlaylistEntry("", "", "", media_format)
+    options = fetch_options(
+        config,
+        entry,
+        output_root=root,
+        items=items,
+        dry_run=dry_run,
+        cover=cover,
+        max_height=max_height,
+        quality_max=quality == Quality.MAX,
+    )
+    worst = max(run_fetch(url, entry, options, config, backend) for url in urls)
     if worst:
         raise typer.Exit(worst)
