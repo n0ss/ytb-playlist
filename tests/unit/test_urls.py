@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import pytest
 
-from ytb_playlist.urls import UnsupportedUrlError, playlist_url
+from ytb_playlist.urls import UnsupportedUrlError, playlist_id, playlist_url
 
 PLAYLIST_ID = "PL9wDNu3ZrVQ63LOO81qh8-Ycq6-vIEqcg"
 CANONICAL = f"https://www.youtube.com/playlist?list={PLAYLIST_ID}"
@@ -54,3 +54,7 @@ def test_playlist_urls_normalise_to_one_form(url: str) -> None:
 def test_unsupported_urls_are_rejected(url: str, message: str) -> None:
     with pytest.raises(UnsupportedUrlError, match=message):
         playlist_url(url)
+
+
+def test_playlist_id_comes_from_any_accepted_form() -> None:
+    assert playlist_id(f"https://www.youtube.com/show/VL{PLAYLIST_ID}?si=x") == PLAYLIST_ID

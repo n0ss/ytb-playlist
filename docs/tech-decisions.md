@@ -154,4 +154,5 @@
 - **Decision:** saved playlists live in a generated `playlists.toml` beside the config, not in `config.toml`. Each setting takes the CLI value, then the playlist's, then the file's or environment's, then the default. Unknown config keys are errors. `playlist remove` forgets the entry and leaves all files. `sync --all` carries on after a failure, and the worst exit code wins.
 - **Why:** Python can read TOML but not write it, so rewriting `config.toml` would lose comments. A typo in a config key should fail clearly rather than do nothing.
 - **Left out:** `config edit`, `-v`, `-q`, `--no-color` and `--cookies-from-browser`, until a real need appears. `--config` doesn't move `playlists.toml`, which stays in the default folder.
+- **One source of settings:** `fetch`, `sync`, `tag` and `cover` all find a saved playlist by its ID, so a saved album, genre or cover applies whichever command runs.
 - **Added:** `sync --dry-run`, because a first sync of a long playlist can mean many gigabytes.

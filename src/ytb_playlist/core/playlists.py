@@ -31,6 +31,13 @@ class PlaylistEntry:
     max_height: int | None = None
 
 
+@dataclass(frozen=True)
+class TagSettings:
+    album: str | None
+    genre: str
+    cover: CoverSource
+
+
 def _text(table: dict, key: str, required: bool = False) -> str | None:
     value = table.get(key) if not required else table[key]
     if value is not None and not isinstance(value, str):
@@ -40,7 +47,8 @@ def _text(table: dict, key: str, required: bool = False) -> str | None:
 
 def _entry(name: str, table: dict) -> PlaylistEntry:
     height = table.get("max_height")
-    if height is not None and (not isinstance(height, int) or height < 1):
+    is_number = isinstance(height, int) and not isinstance(height, bool)
+    if height is not None and (not is_number or height < 1):
         raise ValueError("max_height must be a positive whole number")
     cover = _text(table, "cover")
     return PlaylistEntry(
@@ -117,9 +125,24 @@ def remove_playlist(folder: Path, name: str) -> None:
     save_playlists(folder, entries)
 
 
+def find_entry(entries: dict[str, PlaylistEntry], playlist_id: str | None) -> PlaylistEntry | None:
+    for entry in entries.values():
+        if entry.playlist_id == playlist_id:
+            return entry
+    return None
+
+
+def tag_settings(config: Config, entry: PlaylistEntry | None) -> TagSettings:
+    """What tags a playlist gets, wherever the tagging starts from."""
+    if entry is None:
+        return TagSettings(None, config.genre, config.cover)
+    return TagSettings(entry.album, entry.genre or config.genre, entry.cover or config.cover)
+
+
 def fetch_options(
     config: Config,
-    entry: PlaylistEntry,
+    media_format: MediaFormat,
+    entry: PlaylistEntry | None = None,
     *,
     output_root: Path | None = None,
     items: str | None = None,
@@ -131,13 +154,13 @@ def fetch_options(
 ) -> FetchOptions:
     """Each setting takes the CLI value, then the playlist's, then the config's."""
     return FetchOptions(
-        format=entry.format,
+        format=media_format,
         output_root=output_root or config.output_root,
         items=items,
         dry_run=dry_run,
         retry_failed=retry_failed,
-        cover=cover or entry.cover or config.cover,
-        max_height=max_height or entry.max_height or config.max_height,
+        cover=cover or tag_settings(config, entry).cover,
+        max_height=max_height or (entry and entry.max_height) or config.max_height,
         quality_max=quality_max,
         sleep_min=config.sleep_min,
         sleep_max=config.sleep_max,

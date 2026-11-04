@@ -9,11 +9,14 @@ from ytb_playlist.core.playlists import (
     PLAYLISTS_FILE,
     PlaylistEntry,
     PlaylistsError,
+    TagSettings,
     add_playlist,
     fetch_options,
+    find_entry,
     load_playlists,
     remove_playlist,
     save_playlists,
+    tag_settings,
 )
 
 URL = "https://www.youtube.com/playlist?list=PLone"
@@ -69,6 +72,7 @@ def test_failed_save_keeps_the_previous_file(
         '[playlists.a]\nurl = "x"\n',
         '[playlists.a]\nurl = "x"\nplaylist_id = "p"\nformat = "ogg"\n',
         '[playlists.a]\nurl = "x"\nplaylist_id = "p"\nformat = "mp3"\nmax_height = "tall"\n',
+        '[playlists.a]\nurl = "x"\nplaylist_id = "p"\nformat = "mp3"\nmax_height = true\n',
         '[playlists.a]\nurl = "x"\nplaylist_id = "p"\nformat = "mp3"\ncover = "wide"\n',
         '[playlists.a]\nurl = 3\nplaylist_id = "p"\nformat = "mp3"\n',
         'playlists = "x"\n',
@@ -110,7 +114,7 @@ def test_remove_of_an_unknown_name_is_an_error(tmp_path: Path) -> None:
 
 
 def test_options_come_from_the_config_by_default() -> None:
-    options = fetch_options(CONFIG, ENTRY)
+    options = fetch_options(CONFIG, MediaFormat.MP3, ENTRY)
     assert options.format == MediaFormat.MP3
     assert options.output_root == Path("/root")
     assert (options.max_height, options.sleep_min, options.sleep_max) == (1080, 1, 2)
@@ -118,19 +122,41 @@ def test_options_come_from_the_config_by_default() -> None:
 
 
 def test_playlist_settings_beat_the_config() -> None:
-    options = fetch_options(CONFIG, FULL)
+    options = fetch_options(CONFIG, MediaFormat.MP4, FULL)
     assert (options.format, options.max_height) == (MediaFormat.MP4, 720)
     assert options.cover == CoverSource.PLAYLIST
 
 
 def test_cli_values_beat_the_playlist_settings() -> None:
-    options = fetch_options(CONFIG, FULL, max_height=480, cover=CoverSource.EPISODE)
+    options = fetch_options(
+        CONFIG, MediaFormat.MP4, FULL, max_height=480, cover=CoverSource.EPISODE
+    )
     assert (options.max_height, options.cover) == (480, CoverSource.EPISODE)
 
 
 def test_retry_failed_is_passed_on() -> None:
-    assert fetch_options(CONFIG, ENTRY, retry_failed=True).retry_failed
+    assert fetch_options(CONFIG, MediaFormat.MP3, retry_failed=True).retry_failed
 
 
 def test_output_root_override() -> None:
-    assert fetch_options(CONFIG, ENTRY, output_root=Path("/o")).output_root == Path("/o")
+    options = fetch_options(CONFIG, MediaFormat.MP3, output_root=Path("/o"))
+    assert options.output_root == Path("/o")
+
+
+def test_options_work_without_a_saved_playlist() -> None:
+    options = fetch_options(CONFIG, MediaFormat.MP4)
+    assert (options.format, options.max_height) == (MediaFormat.MP4, 1080)
+
+
+def test_entry_is_found_by_playlist_id() -> None:
+    assert find_entry({ENTRY.name: ENTRY, FULL.name: FULL}, "PLtwo") == FULL
+    assert find_entry({ENTRY.name: ENTRY}, "PLnone") is None
+
+
+def test_tag_settings_come_from_the_config_without_an_entry() -> None:
+    assert tag_settings(CONFIG, None) == TagSettings(None, "Global", CoverSource.EPISODE)
+
+
+def test_tag_settings_prefer_the_saved_playlist() -> None:
+    settings = tag_settings(CONFIG, FULL)
+    assert settings == TagSettings(FULL.album, "Radio", CoverSource.PLAYLIST)

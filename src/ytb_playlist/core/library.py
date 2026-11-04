@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from ytb_playlist.core.models import CoverSource
 from ytb_playlist.core.state import (
     STATE_DIR,
     THUMBNAIL_DIR,
@@ -38,8 +39,18 @@ class LocalItem:
         return self.path.parent / STATE_DIR
 
     @property
-    def thumbnail(self) -> Path | None:
-        return find_thumbnail(self.state_dir / THUMBNAIL_DIR, self.video_id)
+    def playlist_id(self) -> str | None:
+        state = load_state(self.path.parent)
+        return state.playlist_id if state else None
+
+    def thumbnail(self, cover: CoverSource = CoverSource.EPISODE) -> Path | None:
+        """A playlist cover applies to every track; without one, the episode's own is used."""
+        thumbnails = self.state_dir / THUMBNAIL_DIR
+        if cover == CoverSource.PLAYLIST and self.playlist_id:
+            image = find_thumbnail(thumbnails, self.playlist_id)
+            if image is not None:
+                return image
+        return find_thumbnail(thumbnails, self.video_id)
 
 
 def media_files(paths: list[Path]) -> list[Path]:

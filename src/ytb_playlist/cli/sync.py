@@ -10,7 +10,7 @@ from rich.text import Text
 from ytb_playlist.cli import common, exit_codes
 from ytb_playlist.cli.fetch import run_fetch
 from ytb_playlist.cli.playlist import load_or_exit
-from ytb_playlist.core.playlists import PlaylistEntry, fetch_options
+from ytb_playlist.core.playlists import PlaylistEntry, fetch_options, tag_settings
 
 
 def _selected(name: str | None, every: bool) -> list[PlaylistEntry]:
@@ -44,7 +44,9 @@ def sync_command(
     worst = 0
     for entry in entries:
         console.print(Text(entry.name, style="bold"), soft_wrap=True)
-        options = fetch_options(config, entry, retry_failed=retry_failed, dry_run=dry_run)
-        worst = max(worst, run_fetch(entry.url, entry, options, config, backend))
+        options = fetch_options(
+            config, entry.format, entry, retry_failed=retry_failed, dry_run=dry_run
+        )
+        worst = max(worst, run_fetch(entry.url, options, tag_settings(config, entry), backend))
     if worst:
         raise typer.Exit(worst)

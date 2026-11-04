@@ -10,7 +10,9 @@ from PIL import Image
 from typer.testing import CliRunner
 
 from ytb_playlist.cli.app import app
-from ytb_playlist.core.models import MediaFormat
+from ytb_playlist.config import default_config_dir
+from ytb_playlist.core.models import CoverSource, MediaFormat
+from ytb_playlist.core.playlists import PlaylistEntry, save_playlists
 from ytb_playlist.core.state import PlaylistState, load_state, save_state
 
 runner = CliRunner()
@@ -40,6 +42,7 @@ def library(
     tmp_path: Path, media_file: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
 ) -> Library:
     monkeypatch.setenv("COLUMNS", "200")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     folder = tmp_path / "Show [PLx]"
     (folder / ".ytb-playlist" / "thumbs").mkdir(parents=True)
     save_state(folder, PlaylistState("PLx", MediaFormat.MP3))
@@ -123,6 +126,61 @@ def test_folder_without_media_exits_2(library: Library) -> None:
     result = runner.invoke(app, ["tag", str(library.folder)])
     assert result.exit_code == 2
     assert "no MP3 or MP4" in result.stderr
+
+
+def saved(**settings: object) -> None:
+    entry = PlaylistEntry("Show", "url", "PLx", MediaFormat.MP3, **settings)
+    save_playlists(default_config_dir(), {entry.name: entry})
+
+
+def test_tag_keeps_the_saved_album_and_genre(library: Library) -> None:
+    saved(album="Custom album", genre="Radio")
+    path = library.add()
+    assert runner.invoke(app, ["tag", str(path)]).exit_code == 0
+    assert str(ID3(path)["TALB"]) == "Custom album"
+    assert str(ID3(path)["TCON"]) == "Radio"
+
+
+def test_tag_uses_the_config_genre_without_a_saved_playlist(
+    library: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("YTB_PLAYLIST_GENRE", "From env")
+    path = library.add()
+    runner.invoke(app, ["tag", str(path)])
+    assert str(ID3(path)["TCON"]) == "From env"
+
+
+def test_tag_uses_the_saved_playlist_cover(library: Library) -> None:
+    saved(cover=CoverSource.PLAYLIST)
+    path = library.add()
+    library.thumbnail()
+    Image.new("RGB", (188, 188), "green").save(library.state_dir / "thumbs" / "PLx.jpg")
+    runner.invoke(app, ["tag", str(path)])
+    assert cover_size(path) == (188, 188)
+
+
+def test_cover_uses_the_saved_playlist_cover(library: Library) -> None:
+    saved(cover=CoverSource.PLAYLIST)
+    path = library.add()
+    runner.invoke(app, ["tag", str(path)])
+    Image.new("RGB", (188, 188), "green").save(library.state_dir / "thumbs" / "PLx.jpg")
+    assert runner.invoke(app, ["cover", str(path)]).exit_code == 0
+    assert cover_size(path) == (188, 188)
+
+
+def test_playlist_cover_setting_falls_back_to_the_episode(library: Library) -> None:
+    saved(cover=CoverSource.PLAYLIST)
+    path = library.add()
+    library.thumbnail()
+    runner.invoke(app, ["tag", str(path)])
+    assert cover_size(path) == (720, 720)
+
+
+def test_folder_without_state_still_tags(library: Library) -> None:
+    (library.state_dir / "state.json").unlink()
+    path = library.add()
+    assert runner.invoke(app, ["tag", str(path)]).exit_code == 0
+    assert str(ID3(path)["TPE1"]) == "Radio Nova"
 
 
 def test_cover_replaces_only_the_cover(library: Library) -> None:

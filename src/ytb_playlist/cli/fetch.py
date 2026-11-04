@@ -13,7 +13,7 @@ from rich.text import Text
 
 from ytb_playlist.backends.base import Backend, BackendError
 from ytb_playlist.cli import common, exit_codes
-from ytb_playlist.config import Config
+from ytb_playlist.cli.playlist import load_or_exit
 from ytb_playlist.core.fetch import FetchError, ItemsError, fetch
 from ytb_playlist.core.models import (
     CoverSource,
@@ -29,11 +29,17 @@ from ytb_playlist.core.models import (
     ItemTagged,
     MediaFormat,
 )
-from ytb_playlist.core.playlists import PlaylistEntry, fetch_options
+from ytb_playlist.core.playlists import (
+    PlaylistEntry,
+    TagSettings,
+    fetch_options,
+    find_entry,
+    tag_settings,
+)
 from ytb_playlist.core.state import FolderConflictError, FormatChangeError, StateError
 from ytb_playlist.naming import UnsafeIdError
 from ytb_playlist.tagging.apply import tag_file
-from ytb_playlist.urls import UnsupportedUrlError
+from ytb_playlist.urls import UnsupportedUrlError, playlist_id
 
 USAGE_ERRORS = (
     UnsupportedUrlError,
@@ -100,13 +106,11 @@ class _Renderer:
             self.task = None
 
 
-def run_fetch(
-    url: str, entry: PlaylistEntry, options: FetchOptions, config: Config, backend: Backend
-) -> int:
+def run_fetch(url: str, options: FetchOptions, settings: TagSettings, backend: Backend) -> int:
     """Fetch one playlist and return its exit code, so the next one can still run."""
 
     def tagger(path: Path, info: Mapping[str, object], thumbnail: Path | None) -> tuple[str, ...]:
-        return tag_file(path, info, thumbnail, album=entry.album, genre=entry.genre or config.genre)
+        return tag_file(path, info, thumbnail, album=settings.album, genre=settings.genre)
 
     with Progress(transient=True) as progress:
         renderer = _Renderer(progress)
@@ -122,6 +126,14 @@ def run_fetch(
             common.print_error(error)
             return exit_codes.MISSING_DEPENDENCY
     return exit_codes.PARTIAL if renderer.partial else 0
+
+
+def _saved_entry(entries: dict[str, PlaylistEntry], url: str) -> PlaylistEntry | None:
+    """A bad URL has no saved entry; the fetch itself reports it."""
+    try:
+        return find_entry(entries, playlist_id(url))
+    except UnsupportedUrlError:
+        return None
 
 
 def fetch_command(
@@ -141,17 +153,21 @@ def fetch_command(
     config = common.load_config_or_exit(ctx)
     backend = common.make_backend(config)
     root = out.expanduser().absolute() if out else None
-    entry = PlaylistEntry("", "", "", media_format)
-    options = fetch_options(
-        config,
-        entry,
-        output_root=root,
-        items=items,
-        dry_run=dry_run,
-        cover=cover,
-        max_height=max_height,
-        quality_max=quality == Quality.MAX,
-    )
-    worst = max(run_fetch(url, entry, options, config, backend) for url in urls)
+    entries = load_or_exit()
+    worst = 0
+    for url in urls:
+        entry = _saved_entry(entries, url)
+        options = fetch_options(
+            config,
+            media_format,
+            entry,
+            output_root=root,
+            items=items,
+            dry_run=dry_run,
+            cover=cover,
+            max_height=max_height,
+            quality_max=quality == Quality.MAX,
+        )
+        worst = max(worst, run_fetch(url, options, tag_settings(config, entry), backend))
     if worst:
         raise typer.Exit(worst)

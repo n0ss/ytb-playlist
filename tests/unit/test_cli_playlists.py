@@ -260,6 +260,64 @@ def test_fetch_uses_config_defaults(root: Path, monkeypatch: pytest.MonkeyPatch)
     assert backend.requests[0].max_height == 360
 
 
+def test_fetch_of_a_saved_playlist_uses_its_settings(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = use(monkeypatch, FakeBackend(("a",)))
+    calls = []
+    monkeypatch.setattr(
+        "ytb_playlist.cli.fetch.tag_file", lambda *_a, **kwargs: calls.append(kwargs) or ()
+    )
+    saved(PlaylistEntry("Show", URL, PLAYLIST_ID, MediaFormat.MP4, "A", "Radio", None, 480))
+    runner.invoke(app, ["fetch", f"{URL}&si=x", "--format", "mp4"])
+    assert calls == [{"album": "A", "genre": "Radio"}]
+    assert backend.requests[0].max_height == 480
+
+
+def test_fetch_flag_beats_the_saved_setting(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = use(monkeypatch, FakeBackend(("a",)))
+    saved(PlaylistEntry("Show", URL, PLAYLIST_ID, MediaFormat.MP4, max_height=480))
+    runner.invoke(app, ["fetch", URL, "--format", "mp4", "--max-height", "360"])
+    assert backend.requests[0].max_height == 360
+
+
+def test_fetch_without_a_saved_playlist_uses_the_config_genre(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("YTB_PLAYLIST_GENRE", "From env")
+    use(monkeypatch, FakeBackend(("a",)))
+    calls = []
+    monkeypatch.setattr(
+        "ytb_playlist.cli.fetch.tag_file", lambda *_a, **kwargs: calls.append(kwargs) or ()
+    )
+    runner.invoke(app, ["fetch", URL, "--format", "mp3"])
+    assert calls == [{"album": None, "genre": "From env"}]
+
+
+def test_add_with_an_unwritable_folder_exits_3(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend())
+
+    def refuse(*_: object) -> None:
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr("ytb_playlist.core.playlists.save_playlists", refuse)
+    result = runner.invoke(app, ["playlist", "add", URL, "--format", "mp3"])
+    assert result.exit_code == 3
+    assert "Permission denied" in result.stderr
+
+
+def test_remove_with_an_unwritable_folder_exits_3(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    saved(entry())
+
+    def refuse(*_: object) -> None:
+        raise OSError(13, "Permission denied")
+
+    monkeypatch.setattr("ytb_playlist.core.playlists.save_playlists", refuse)
+    assert runner.invoke(app, ["playlist", "remove", "Show"]).exit_code == 3
+
+
 def test_config_path_prints_the_file(root: Path) -> None:
     result = runner.invoke(app, ["config", "path"])
     assert result.exit_code == 0

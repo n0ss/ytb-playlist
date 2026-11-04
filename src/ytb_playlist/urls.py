@@ -16,6 +16,10 @@ class UnsupportedUrlError(ValueError):
 
 
 def playlist_url(url: str) -> str:
+    return f"https://www.youtube.com/playlist?list={playlist_id(url)}"
+
+
+def playlist_id(url: str) -> str:
     try:
         parts = urlsplit(url)
         host = parts.hostname
@@ -25,14 +29,14 @@ def playlist_url(url: str) -> str:
         raise UnsupportedUrlError(f"not a YouTube URL: {url}")
 
     if parts.path.startswith(SHOW_PREFIX):
-        playlist_id = parts.path.removeprefix(SHOW_PREFIX)
+        found = parts.path.removeprefix(SHOW_PREFIX)
     else:
-        playlist_id = parse_qs(parts.query).get("list", [""])[0]
+        found = parse_qs(parts.query).get("list", [""])[0]
 
-    if not playlist_id:
+    if not found:
         raise UnsupportedUrlError(f"no playlist in this URL: {url}")
-    if playlist_id.startswith(AUTO_MIX_PREFIX):
+    if found.startswith(AUTO_MIX_PREFIX):
         raise UnsupportedUrlError(f"YouTube auto-mixes aren't supported: {url}")
-    if not is_safe_id(playlist_id):
+    if not is_safe_id(found):
         raise UnsupportedUrlError(f"invalid playlist ID in this URL: {url}")
-    return f"https://www.youtube.com/playlist?list={playlist_id}"
+    return found

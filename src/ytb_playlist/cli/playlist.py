@@ -66,6 +66,9 @@ def add(
     except BackendError as error:
         common.print_error(error)
         raise typer.Exit(exit_codes.NETWORK_ERROR) from error
+    except OSError as error:
+        common.print_error(error)
+        raise typer.Exit(exit_codes.MISSING_DEPENDENCY) from error
     Console().print(Text(f"saved as {entry.name}", style="green"), soft_wrap=True)
 
 
@@ -91,4 +94,7 @@ def remove(name: Annotated[str, typer.Argument(help="Saved name.")]) -> None:
     except PlaylistsError as error:
         common.print_error(error)
         raise typer.Exit(exit_codes.USAGE_ERROR) from error
+    except OSError as error:
+        common.print_error(error)
+        raise typer.Exit(exit_codes.MISSING_DEPENDENCY) from error
     Console().print(Text(f"removed {name}; its files were left in place"), soft_wrap=True)
