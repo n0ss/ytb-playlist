@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from mutagen.id3 import ID3
 
 from ytb_playlist import deps
 from ytb_playlist.backends.ytdlp_proc import YtDlpBackend
@@ -16,6 +17,7 @@ from ytb_playlist.core.models import (
     FetchOptions,
     MediaFormat,
 )
+from ytb_playlist.tagging.apply import tag_file
 
 pytestmark = pytest.mark.network
 
@@ -43,7 +45,7 @@ def test_three_clipped_items_then_a_rerun_downloads_nothing(tmp_path: Path) -> N
 
     options = FetchOptions(MediaFormat.MP3, tmp_path, items="1:3", clip_seconds=CLIP_SECONDS)
     events: list[Event] = []
-    fetch(URL, options, real, events.append, date.today())
+    fetch(URL, options, real, tag_file, events.append, date.today())
     assert events[-1] == FetchDone(saved=3, failed=0, skipped=0)
 
     folder = next(tmp_path.iterdir())
@@ -51,13 +53,17 @@ def test_three_clipped_items_then_a_rerun_downloads_nothing(tmp_path: Path) -> N
     assert len(media) == 3
     assert all(path.name.startswith("20") for path in media)
     assert all(f"[{video_id}]" in " ".join(p.name for p in media) for video_id in FIRST_IDS)
+    tags = ID3(media[0], translate=False)
+    assert str(tags["TPE1"]) == "Radio Nova"
+    assert str(tags["TALB"]) == 'Les intégrales de "La dernière"'
+    assert len(tags.getall("APIC")) == 1
     state_dir = folder / ".ytb-playlist"
     assert len(list(state_dir.glob("*.info.json"))) == 3
     assert len(list((state_dir / "thumbs").glob("*.jpg"))) == 3
     assert not (state_dir / "tmp").exists()
 
     rerun: list[Event] = []
-    fetch(URL, options, real, rerun.append, date.today())
+    fetch(URL, options, real, tag_file, rerun.append, date.today())
     assert rerun[-1] == FetchDone(saved=0, failed=0, skipped=0)
 
     record_passing_version()

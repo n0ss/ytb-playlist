@@ -22,10 +22,12 @@ from ytb_playlist.core.models import (
     ItemProgress,
     ItemSaved,
     ItemStarted,
+    ItemTagged,
     MediaFormat,
 )
 from ytb_playlist.core.state import FolderConflictError, FormatChangeError, StateError
 from ytb_playlist.naming import UnsafeIdError
+from ytb_playlist.tagging.apply import tag_file
 from ytb_playlist.urls import UnsupportedUrlError
 
 USAGE_ERRORS = (
@@ -44,6 +46,7 @@ class _Renderer:
         self.progress = progress
         self.task: TaskID | None = None
         self.partial = False
+        self.tagged = 0
 
     def __call__(self, event: Event) -> None:
         match event:
@@ -57,6 +60,11 @@ class _Renderer:
             case ItemSaved():
                 self._end_task()
                 self._print(f"saved {event.path.name}", "green")
+            case ItemTagged():
+                self.tagged += 1
+                self._print(f"tagged {event.video_id}", "green")
+                for warning in event.warnings:
+                    self._print(warning, "yellow")
             case ItemFailed():
                 self._end_task()
                 permanent = event.kind == FailureKind.PERMANENT
@@ -66,9 +74,10 @@ class _Renderer:
                 )
             case FetchDone():
                 self.partial = event.failed > 0
-                if event.saved or event.failed:
+                if event.saved or event.failed or self.tagged:
                     self._print(
-                        f"{event.saved} saved, {event.failed} failed, {event.skipped} skipped"
+                        f"{event.saved} saved, {self.tagged} tagged, "
+                        f"{event.failed} failed, {event.skipped} skipped"
                     )
                 else:
                     self._print(f"Nothing new, {event.skipped} skipped")
@@ -86,7 +95,7 @@ def _fetch_one(url: str, options: FetchOptions, backend: Backend) -> int:
     with Progress(transient=True) as progress:
         renderer = _Renderer(progress)
         try:
-            fetch(url, options, backend, renderer, date.today())
+            fetch(url, options, backend, tag_file, renderer, date.today())
         except USAGE_ERRORS as error:
             common.print_error(error)
             return exit_codes.USAGE_ERROR

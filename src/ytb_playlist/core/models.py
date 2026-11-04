@@ -69,6 +69,12 @@ class ItemSaved:
 
 
 @dataclass(frozen=True)
+class ItemTagged:
+    video_id: str
+    warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ItemFailed:
     video_id: str
     kind: FailureKind
@@ -82,4 +88,4 @@ class FetchDone:
     skipped: int
 
 
-Event = FetchPlanned | ItemStarted | ItemProgress | ItemSaved | ItemFailed | FetchDone
+Event = FetchPlanned | ItemStarted | ItemProgress | ItemSaved | ItemTagged | ItemFailed | FetchDone

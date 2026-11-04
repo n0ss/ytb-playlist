@@ -15,6 +15,7 @@ from ytb_playlist.backends.base import (
 from ytb_playlist.cli import common
 from ytb_playlist.cli.app import app
 from ytb_playlist.core.models import FailureKind
+from ytb_playlist.tagging.apply import TaggingError
 
 runner = CliRunner()
 URL = f"https://www.youtube.com/playlist?list={PLAYLIST_ID}"
@@ -30,6 +31,7 @@ def out(tmp_path: Path, home: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def use(monkeypatch: pytest.MonkeyPatch, backend: FakeBackend) -> FakeBackend:
     monkeypatch.setattr(common, "make_backend", lambda _config: backend)
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ())
     return backend
 
 
@@ -147,6 +149,41 @@ def test_full_disk_exits_3(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     result = fetch_cli(out)
     assert result.exit_code == 3
     assert "No space left" in result.stderr
+
+
+def test_tagging_failure_exits_1(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend(("a",)))
+
+    def fail(*_: object) -> tuple[str, ...]:
+        raise TaggingError("bad file")
+
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", fail)
+    result = fetch_cli(out)
+    assert result.exit_code == 1
+    assert "bad file" in result.output
+
+
+def test_tagging_warning_is_shown(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend(("a",)))
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ("no cover found",))
+    result = fetch_cli(out)
+    assert result.exit_code == 0
+    assert "no cover found" in result.output
+
+
+def test_retagging_an_existing_file_is_reported(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend(("a",)))
+
+    def fail(*_: object) -> tuple[str, ...]:
+        raise TaggingError("bad file")
+
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", fail)
+    fetch_cli(out)
+    monkeypatch.setattr("ytb_playlist.cli.fetch.tag_file", lambda *_: ())
+    result = fetch_cli(out)
+    assert result.exit_code == 0
+    assert "tagged a" in result.output
+    assert "Nothing new" not in result.output
 
 
 def test_format_is_required(out: Path) -> None:

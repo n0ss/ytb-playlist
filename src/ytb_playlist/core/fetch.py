@@ -31,6 +31,7 @@ from ytb_playlist.core.models import (
     ItemProgress,
     ItemSaved,
     ItemStarted,
+    ItemTagged,
     PlaylistInfo,
 )
 from ytb_playlist.core.state import (
@@ -40,13 +41,14 @@ from ytb_playlist.core.state import (
     load_state,
     save_state,
 )
+from ytb_playlist.cover import THUMBNAIL_SUFFIXES, find_thumbnail
 from ytb_playlist.naming import file_name, folder_name, is_safe_id
+from ytb_playlist.tagging.apply import Tagger, TaggingError
 from ytb_playlist.urls import playlist_url
 
 ARCHIVE_FILE = "archive.txt"
 WORK_DIR = "tmp"
 THUMBNAIL_DIR = "thumbs"
-THUMBNAIL_SUFFIXES = (".jpg", ".webp", ".png")
 ITEM_RANGE = re.compile(r"(\d+)(?::(\d+))?")
 
 
@@ -110,6 +112,7 @@ class _Run:
         folder: Path,
         state: PlaylistState,
         ext: str,
+        tagger: Tagger,
         on_event: Callable[[Event], None],
         today: date,
     ) -> None:
@@ -118,6 +121,7 @@ class _Run:
         self.work = self.state_dir / WORK_DIR
         self.state = state
         self.ext = ext
+        self.tagger = tagger
         self.on_event = on_event
         self.today = today.isoformat()
         self.saved = 0
@@ -132,6 +136,20 @@ class _Run:
             media = self.work / f"{video_id}.{self.ext}"
             if media.exists():
                 self._save(video_id, media)
+
+    def retry_untagged(self, archived: set[str]) -> None:
+        for video_id in sorted(archived - self.state.tagged):
+            info_path = self.state_dir / f"{video_id}.info.json"
+            if not info_path.exists():
+                continue
+            try:
+                info = self._read_info(info_path, video_id)
+            except (OSError, ValueError) as error:
+                self._fail(video_id, FailureKind.TEMPORARY, f"could not tag the item: {error}")
+                continue
+            target = self.folder / file_name(info, self.ext)
+            if target.exists():
+                self._tag(video_id, target, info)
 
     def handle(self, message: DownloadMessage) -> None:
         match message:
@@ -166,7 +184,7 @@ class _Run:
             self._fail(video_id, FailureKind.PERMANENT, reason)
             return
         try:
-            target = self._move_into_place(video_id, media)
+            target, info = self._move_into_place(video_id, media)
         except (OSError, ValueError) as error:
             self._fail(video_id, FailureKind.TEMPORARY, f"could not finish the item: {error}")
             return
@@ -174,14 +192,31 @@ class _Run:
         save_state(self.folder, self.state)
         self.saved += 1
         self.on_event(ItemSaved(video_id, target))
+        self._tag(video_id, target, info)
 
-    def _move_into_place(self, video_id: str, media: Path) -> Path:
+    def _tag(self, video_id: str, target: Path, info: dict) -> None:
+        thumbnail = find_thumbnail(self.state_dir / THUMBNAIL_DIR, video_id)
+        try:
+            warnings = self.tagger(target, info, thumbnail)
+        except TaggingError as error:
+            self._fail(video_id, FailureKind.TEMPORARY, f"could not tag: {error}")
+            return
+        self.state.tagged.add(video_id)
+        self.state.failures.pop(video_id, None)
+        save_state(self.folder, self.state)
+        self.on_event(ItemTagged(video_id, warnings))
+
+    def _read_info(self, path: Path, video_id: str) -> dict:
+        info = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(info, dict) or info.get("id") != video_id:
+            raise ValueError(f"metadata doesn't match the item: {path}")
+        return info
+
+    def _move_into_place(self, video_id: str, media: Path) -> tuple[Path, dict]:
         if not is_safe_id(video_id) or media.parent.resolve() != self.work.resolve():
             raise ValueError(f"unexpected file: {media}")
         info_path = self.work / f"{video_id}.info.json"
-        info = json.loads(info_path.read_text(encoding="utf-8"))
-        if not isinstance(info, dict) or info.get("id") != video_id:
-            raise ValueError(f"metadata doesn't match the item: {info_path}")
+        info = self._read_info(info_path, video_id)
         target = self.folder / file_name(info, media.suffix.removeprefix("."))
         if target.exists():
             media.unlink()
@@ -194,7 +229,7 @@ class _Run:
             if thumbnail.exists():
                 thumbnails.mkdir(exist_ok=True)
                 os.replace(thumbnail, thumbnails / thumbnail.name)
-        return target
+        return target, info
 
     def _fail(self, video_id: str, kind: FailureKind, reason: str) -> None:
         self.state.failures[video_id] = Failure(kind, reason, self.today)
@@ -222,6 +257,7 @@ def fetch(
     url: str,
     options: FetchOptions,
     backend: Backend,
+    tagger: Tagger,
     on_event: Callable[[Event], None],
     today: date,
 ) -> None:
@@ -233,11 +269,12 @@ def fetch(
     state.require_format(options.format)
     selected = parse_items(options.items, info.item_count)
 
-    run = _Run(folder, state, options.format, on_event, today)
+    run = _Run(folder, state, options.format, tagger, on_event, today)
     archive = run.state_dir / ARCHIVE_FILE
     archived = _read_archive(archive)
     if not options.dry_run:
         run.recover(archived)
+        run.retry_untagged(archived)
 
     item_ids = set(info.item_ids)
     skipped = state.permanent_failures()

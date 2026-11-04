@@ -18,6 +18,7 @@ from mutagen.id3 import (
     TYER,
     WOAS,
 )
+from mutagen.mp3 import MP3
 
 from ytb_playlist.tagging.mapping import TrackTags
 
@@ -32,7 +33,12 @@ TEXT_FRAMES = (
 )
 
 
+def _picture(cover: bytes) -> APIC:
+    return APIC(encoding=UTF16, mime="image/jpeg", type=FRONT_COVER, desc="", data=cover)
+
+
 def write_id3(path: Path, tags: TrackTags, cover: bytes | None) -> None:
+    MP3(path)  # Refuses a file that isn't MP3; ID3 alone would tag anything.
     frames = ID3()
     for frame, field in TEXT_FRAMES:
         value = getattr(tags, field)
@@ -50,5 +56,11 @@ def write_id3(path: Path, tags: TrackTags, cover: bytes | None) -> None:
         frames.add(WOAS(url=tags.url))
     frames.add(TXXX(encoding=UTF16, desc="YOUTUBE_ID", text=[tags.video_id]))
     if cover is not None:
-        frames.add(APIC(encoding=UTF16, mime="image/jpeg", type=FRONT_COVER, desc="", data=cover))
+        frames.add(_picture(cover))
+    frames.save(path, v1=0, v2_version=3)
+
+
+def replace_id3_cover(path: Path, cover: bytes) -> None:
+    frames = ID3(path, translate=False)
+    frames.setall("APIC", [_picture(cover)])
     frames.save(path, v1=0, v2_version=3)

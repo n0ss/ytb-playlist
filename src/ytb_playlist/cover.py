@@ -11,6 +11,8 @@ from PIL import Image
 MAX_SQUARE_SIDE = 1000
 MAX_COVER_BYTES = 500_000
 QUALITIES = (90, 85, 80, 75)
+# yt-dlp converts to JPEG, but keeps the original if the conversion fails.
+THUMBNAIL_SUFFIXES = (".jpg", ".webp", ".png")
 
 
 class CoverError(Exception):
@@ -22,6 +24,14 @@ class Cover:
     data: bytes
     quality: int
     over_budget: bool
+
+
+def find_thumbnail(folder: Path, video_id: str) -> Path | None:
+    for suffix in THUMBNAIL_SUFFIXES:
+        path = folder / f"{video_id}{suffix}"
+        if path.exists():
+            return path
+    return None
 
 
 def square_cover(source: Path) -> Cover:

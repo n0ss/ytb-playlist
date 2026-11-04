@@ -19,6 +19,10 @@ TEXT_ATOMS = (
 )
 
 
+def _picture(cover: bytes) -> MP4Cover:
+    return MP4Cover(cover, imageformat=MP4Cover.FORMAT_JPEG)
+
+
 def write_mp4(path: Path, tags: TrackTags, cover: bytes | None) -> None:
     MP4(path).delete()
     atoms = MP4(path)
@@ -35,5 +39,11 @@ def write_mp4(path: Path, tags: TrackTags, cover: bytes | None) -> None:
         atoms[f"{FREEFORM}URL"] = [MP4FreeForm(tags.url.encode())]
     atoms[f"{FREEFORM}YOUTUBE_ID"] = [MP4FreeForm(tags.video_id.encode())]
     if cover is not None:
-        atoms["covr"] = [MP4Cover(cover, imageformat=MP4Cover.FORMAT_JPEG)]
+        atoms["covr"] = [_picture(cover)]
+    atoms.save()
+
+
+def replace_mp4_cover(path: Path, cover: bytes) -> None:
+    atoms = MP4(path)
+    atoms["covr"] = [_picture(cover)]
     atoms.save()

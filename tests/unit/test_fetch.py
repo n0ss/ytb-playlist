@@ -28,6 +28,7 @@ from ytb_playlist.core.models import (
     ItemProgress,
     ItemSaved,
     ItemStarted,
+    ItemTagged,
     MediaFormat,
     PlaylistInfo,
 )
@@ -39,6 +40,7 @@ from ytb_playlist.core.state import (
     save_state,
 )
 from ytb_playlist.naming import UnsafeIdError
+from ytb_playlist.tagging.apply import TaggingError
 from ytb_playlist.urls import UnsupportedUrlError
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -48,16 +50,29 @@ GONE = DownloadError("b", FailureKind.PERMANENT, "This video is unavailable")
 FLAKY = DownloadError("b", FailureKind.TEMPORARY, "timeout")
 
 
+def no_tag(_path: Path, _info: dict, _thumbnail: Path | None) -> tuple[str, ...]:
+    return ()
+
+
 class Run:
     def __init__(self, root: Path) -> None:
         self.root = root
         self.events: list[Event] = []
+        self.tagged: list[tuple[str, str, str | None]] = []
+        self.tag_error: str | None = None
+        self.tag_warnings: tuple[str, ...] = ()
 
     def __call__(self, backend: FakeBackend, **options: object) -> list[Event]:
         self.events = []
         values = {"format": MediaFormat.MP3, "output_root": self.root} | options
-        fetch(URL, FetchOptions(**values), backend, self.events.append, TODAY)
+        fetch(URL, FetchOptions(**values), backend, self.tag, self.events.append, TODAY)
         return self.events
+
+    def tag(self, path: Path, info: dict, thumbnail: Path | None) -> tuple[str, ...]:
+        self.tagged.append((path.name, info["id"], thumbnail and thumbnail.name))
+        if self.tag_error:
+            raise TaggingError(self.tag_error)
+        return self.tag_warnings
 
     @property
     def folder(self) -> Path:
@@ -104,7 +119,7 @@ def test_unsupported_url_stops_before_any_call(tmp_path: Path) -> None:
     backend = FakeBackend()
     options = FetchOptions(MediaFormat.MP3, tmp_path)
     with pytest.raises(UnsupportedUrlError):
-        fetch("https://vimeo.com/1", options, backend, lambda _: None, TODAY)
+        fetch("https://vimeo.com/1", options, backend, no_tag, lambda _: None, TODAY)
     assert backend.requests == []
 
 
@@ -116,9 +131,82 @@ def test_events_describe_the_run(run: Run) -> None:
     assert events[-1] == FetchDone(saved=2, failed=0, skipped=0)
 
 
-def test_new_items_are_marked_untagged(run: Run) -> None:
-    run(FakeBackend(("a",)))
+def test_saved_items_are_tagged_with_their_metadata_and_thumbnail(run: Run) -> None:
+    events = run(FakeBackend(("a",)))
+    assert run.tagged == [("2024-10-23 - Title a [a].mp3", "a", "a.jpg")]
+    assert load_state(run.folder).tagged == {"a"}
+    assert of_type(events, ItemTagged) == [ItemTagged("a", ())]
+
+
+def test_item_without_a_thumbnail_is_still_tagged(run: Run) -> None:
+    class NoThumbnail(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            media = write_item(request.work_dir, "a")
+            (request.work_dir / "a.jpg").unlink()
+            yield DownloadSaved("a", media)
+
+    run(NoThumbnail(("a",)))
+    assert run.tagged == [("2024-10-23 - Title a [a].mp3", "a", None)]
+
+
+def test_tagging_warnings_reach_the_event(run: Run) -> None:
+    run.tag_warnings = ("cover over budget",)
+    events = run(FakeBackend(("a",)))
+    assert of_type(events, ItemTagged) == [ItemTagged("a", ("cover over budget",))]
+
+
+def test_tagging_failure_keeps_the_file_and_counts_as_failed(run: Run) -> None:
+    run.tag_error = "bad file"
+    events = run(FakeBackend(("a",)))
+    assert run.media() == ["2024-10-23 - Title a [a].mp3"]
+    assert of_type(events, ItemFailed)[0].kind == FailureKind.TEMPORARY
+    assert events[-1] == FetchDone(saved=1, failed=1, skipped=0)
     assert load_state(run.folder).tagged == set()
+
+
+def test_untagged_download_is_retried_without_downloading_again(run: Run) -> None:
+    run.tag_error = "bad file"
+    run(FakeBackend(("a",)))
+    run.tag_error = None
+    backend = FakeBackend(("a",))
+    events = run(backend)
+    assert backend.requests == []
+    assert load_state(run.folder).tagged == {"a"}
+    assert load_state(run.folder).failures == {}
+    assert of_type(events, ItemTagged) == [ItemTagged("a", ())]
+    assert events[-1] == FetchDone(saved=0, failed=0, skipped=0)
+
+
+def test_tagged_items_are_not_tagged_again(run: Run) -> None:
+    run(FakeBackend(("a",)))
+    run.tagged.clear()
+    run(FakeBackend(("a",)))
+    assert run.tagged == []
+
+
+def test_dry_run_tags_nothing(run: Run) -> None:
+    run.tag_error = "bad file"
+    run(FakeBackend(("a",)))
+    run.tag_error = None
+    run.tagged.clear()
+    run(FakeBackend(("a",)), dry_run=True)
+    assert run.tagged == []
+
+
+def test_failed_tagging_stops_nothing_else(run: Run) -> None:
+    run.tag_error = "bad file"
+    events = run(FakeBackend(("a", "c")))
+    assert events[-1] == FetchDone(saved=2, failed=2, skipped=0)
+
+
+def test_tagged_file_removed_by_hand_is_not_an_error(run: Run) -> None:
+    run.tag_error = "bad file"
+    run(FakeBackend(("a",)))
+    (run.folder / "2024-10-23 - Title a [a].mp3").unlink()
+    run.tag_error = None
+    run.tagged.clear()
+    assert run(FakeBackend(("a",)))[-1] == FetchDone(saved=0, failed=0, skipped=0)
+    assert run.tagged == []
 
 
 def test_rerun_downloads_nothing(run: Run) -> None:
@@ -260,7 +348,7 @@ def test_stopping_closes_the_download_stream(run: Run) -> None:
     options = FetchOptions(MediaFormat.MP3, run.root)
     backend = Tracking(("a",))
     with pytest.raises(KeyboardInterrupt):
-        fetch(URL, options, backend, stop, TODAY)
+        fetch(URL, options, backend, no_tag, stop, TODAY)
     assert closed == [True]
 
 
@@ -369,7 +457,7 @@ def test_unsafe_playlist_id_is_refused(tmp_path: Path) -> None:
     backend = FakeBackend()
     backend.info = PlaylistInfo("../evil", "T", ("a",))
     with pytest.raises(UnsafeIdError):
-        fetch(URL, FetchOptions(MediaFormat.MP3, tmp_path), backend, lambda _: None, TODAY)
+        fetch(URL, FetchOptions(MediaFormat.MP3, tmp_path), backend, no_tag, lambda _: None, TODAY)
 
 
 def test_entries_without_an_id_are_not_requested(run: Run) -> None:
@@ -511,4 +599,4 @@ def test_state_from_an_earlier_run_is_kept(run: Run) -> None:
     state = PlaylistState(PLAYLIST_ID, MediaFormat.MP3, tagged={"old"})
     save_state(run.folder, state)
     run(FakeBackend(("a",)))
-    assert load_state(run.folder).tagged == {"old"}
+    assert load_state(run.folder).tagged == {"old", "a"}
