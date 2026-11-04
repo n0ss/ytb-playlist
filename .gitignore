@@ -1,0 +1,25 @@
+# Claude Code, local only
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Media: never committed
+*.mp3
+*.mp4
+*.m4a
+*.webm
+*.part
+
+# macOS
+.DS_Store

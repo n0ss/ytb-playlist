@@ -1,0 +1,75 @@
+# Technical decisions
+
+## 1. 2026-11-04 — Project bootstrap
+- **Decision:** full profile. Python CLI with a GUI-agnostic core. Base skills only, with no repo-scope plugins and no skill search.
+- **Why:** long-lived tool with a metadata pipeline and a possible GUI. No specific need is unmet by the base set and user-level rules.
+- **Alternatives considered:** light profile; `npx skills find` for Python and CLI skills.
+
+## 2. 2026-11-04 — Python 3.14 and Typer 0.27.x
+- **Decision:** target Python 3.14 and Typer 0.27.x.
+- **Why:** 3.14 is already the default `python3`, and all dependencies, PySide6 included, resolved wheels-only for macOS arm64. The plan's Typer 0.24.x was out of date; uv resolved 0.27.3. Nothing has been installed or run on 3.14 yet.
+- **Alternatives considered:** 3.13 had no real case. 3.15 also resolves, but it's newer and gives this project nothing it needs.
+
+## 3. 2026-11-04 — Use the installed yt-dlp through a subprocess
+- **Decision:** run the Homebrew `yt-dlp` as a subprocess with `-J`, `--print` and `--progress-template`. It isn't a Python dependency. The `Backend` protocol stays only as the test seam.
+- **Why:** it matches the original request and leaves one copy to update with `brew upgrade yt-dlp`, which also manages Deno and `yt-dlp-ejs`. yt-dlp's README recommends these options for external programs. The plan's claim that a subprocess loses progress reporting was wrong.
+- **Alternatives considered:** pinned `yt-dlp[default]` library, which gives cleaner errors and a lockfile but a second copy and a project-level upgrade step. Homebrew's library can't be imported directly, because it lives in a private Python 3.15 environment.
+- **Accepted risk:** `brew upgrade` can change behaviour with no lockfile. The network test records the last version it passed, and `doctor` flags any other version.
+
+## 4. 2026-11-04 — Git workflow
+- **Decision:** local repository, one branch per phase, one commit per completed task on the user's go-ahead, and a thermo-nuclear review of the whole branch before merging. No remote until v0.1.0, then GitLab.
+- **Why:** small commits protect work in progress, and each branch gives the review a diff.
+- **Alternatives considered:** one commit per phase; a private GitLab repository after phase 0.
+- **Accepted risk:** until v0.1.0 the code exists only on this Mac, so backups must cover `~/projects`.
+
+## 5. 2026-11-04 — Documentation scope
+- **Decision:** generated CLI reference, reference pages for `config`, `naming`, `tags` and `exit-codes`, and two how-tos. Decisions go in this file, not an ADR folder. CHANGELOG uses dated entries, with the version in the heading from 0.1.0.
+- **Why:** a one-user tool doesn't need the full Diátaxis tree, and this matches the bootstrap templates. Pages get added when a real need appears.
+- **Alternatives considered:** the full tree with 11 hand-written pages; Keep a Changelog.
+
+## 6. 2026-11-04 — State and folders
+- **Decision:** `archive.txt` owns "downloaded"; `state.json` owns "tagged" and failures, and is written atomically. Anything in the archive but not tagged is retried. Folders are found by playlist ID, and two matches stop the run with an error. Each playlist has one format, and `fetch` refuses a different one. yt-dlp downloads to a temp folder as `%(id)s.%(ext)s`, and `naming.py` sets the final name.
+- **Why:** one record per fact avoids disagreement after a crash. Lookup by ID stops a renamed playlist from re-downloading everything. The temp folder gives one naming path, keeps titles out of yt-dlp's file paths, and leaves no partial files in the playlist folder.
+- **Alternatives considered:** `state.json` tracking every stage; rebuilding the folder name from the current title; several formats per playlist.
+
+## 7. 2026-11-04 — Failure handling
+- **Decision:** failed items are recorded with their reason and date. Permanent failures (no compatible format, private, deleted) are skipped on later runs and listed in a summary without affecting the exit code. Temporary or unrecognised failures are retried and exit 1. `sync --retry-failed` retries everything.
+- **Why:** retrying an item that can't succeed adds traffic to YouTube, and a permanent exit 1 would hide new failures.
+- **Alternatives considered:** retrying everything on each run.
+- **Accepted risk:** classifying failures means parsing yt-dlp's error text, which can change. Anything unrecognised counts as temporary.
+
+## 8. 2026-11-04 — File naming
+- **Decision:** `<YYYY-MM-DD> - <Title> [<id>].<ext>` in `<Playlist> [<playlist_id>]/`. The date is `release_date`, else `upload_date`. No time suffix. `"` is removed, `/ \ :` become ` - `, and `* ? < > |` are removed.
+- **Why:** `upload_date` is the date YouTube shows on the video page, and `release_date` only exists for premieres and live streams. A time suffix would make a filename depend on other items, and the ID already guarantees uniqueness.
+- **Alternatives considered:** per-playlist parsing of the broadcast date from titles. On the test playlist, the upload is 3 days after the title's date on all 7 items compared. Parsing could be added later, and `rename` could fix existing files.
+
+## 9. 2026-11-04 — Apple Music tags
+- **Decision:** artist is the channel, minus any ` - Topic` suffix. Album artist is the playlist owner. Album is a per-playlist config override, else the playlist title. Song title is `<YYYY-MM-DD> - <Title>`, without the ID. Track is the playlist position, set once at tagging, with no total and no refresh.
+- **Why:** this is the owner's scheme: simple to sort, and it fits radio shows and series. Album artist keeps mixed-channel playlists in one album. The date prefix sorts songs by name and keeps the full date visible.
+- **Alternatives considered:** `artist` metadata with fallbacks; `n/N` track numbers refreshed by `sync`, which would rewrite every file on each sync and may not reach Music's library anyway.
+- **To verify in phase 1b:** whether Music.app re-reads changed tags after import, and how it displays the date.
+
+## 10. 2026-11-04 — Video format
+- **Decision:** H.264 + AAC in MP4, capped at 1080p or a lower per-playlist `max_height`, with no re-encoding. If no compatible stream exists, the item fails with a clear report. `--quality max` is the opt-in that lifts the cap and allows other codecs.
+- **Why:** H.264 is the most compatible option, and Music and TV don't import MKV. YouTube serves no H.265 on the sampled episodes, so H.265 would mean re-encoding, with quality loss and extra time. 720p is the better way to save space: about 402 MB of video against 1,410 MB at 1080p on the first test episode.
+- **Alternatives considered:** H.265 by default; MKV; falling back to `bv*+ba`.
+
+## 11. 2026-11-04 — Cover art
+- **Decision:** square covers are centre-cropped to the shorter side, capped at 1000×1000, and never upscaled. MP4 keeps the source size. JPEG quality steps down from 90 to 75 until under 500 KB; if it still doesn't fit, keep the quality-75 version and log a warning. Per-playlist `cover = "episode" | "playlist"`, default `episode`.
+- **Why:** the test playlist serves 1920×1080 thumbnails, so fixed 720×720 and 1280×720 sizes were wrong. A heavy cover shouldn't fail a track.
+- **Alternatives considered:** fixed sizes; `--cover playlist` as a flag only, which `sync` wouldn't remember.
+
+## 12. 2026-11-04 — Test strategy
+- **Decision:** the test playlist is Radio Nova's "Les intégrales de La dernière". Network tests are opt-in and use its first 3 items, clipped to about 60 seconds. Cases it can't exercise get hand-edited `info.json` fixtures. If the playlist changes, the test fails with a clear "fixture playlist changed" message.
+- **Why:** episodes run about 1h40, so full downloads would be slow and heavy.
+- **Alternatives considered:** a second playlist for edge cases.
+- **To verify in phase 1a:** that clipped downloads work. If they don't, network tests download one full episode as MP3.
+
+## 13. 2026-11-04 — v0.1.0 scope and phase order
+- **Decision:** `--json` output is out of v1, and the typed events stay. Minimal config moves to phase 2, `rename` to phase 5, and phase 1 splits into tool spikes (1a) and Music.app spikes (1b). Pre-commit is dropped.
+- **Why:** only a non-Python GUI needs `--json`. Each phase has to end on a test it can actually pass. Pre-commit duplicates the user-level hooks, although those only cover Claude's edits and commits.
+- **Alternatives considered:** keeping `--json` in v1; the original phase order.
+
+## 14. 2026-11-04 — Use of third-party content
+- **Decision:** private personal use only, with no redistribution features, and media files are never committed.
+- **Why:** the test playlist is third-party content, and YouTube's terms restrict downloading regardless of use. This records the risk, and doesn't remove it.
