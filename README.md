@@ -1,6 +1,6 @@
-# YouTube Playlist Archiver
+# ytb-playlist
 
-`ytarchive` is a personal command-line tool that downloads YouTube playlists through yt-dlp into one folder per playlist, as MP3 or MP4, named by date and tagged for Apple Music import. It's in early development: the project files exist, and no code does yet.
+`ytb-playlist` is a personal command-line tool that downloads YouTube playlists through yt-dlp into one folder per playlist, as MP3 or MP4, named by date and tagged for Apple Music import. It's in early development: the project is set up, and the features aren't built yet.
 
 ## Structure
 ```
@@ -28,7 +28,7 @@ TBD: commands arrive with phases 2 to 6. The planned interface is in `docs/plan.
 ```bash
 uv run pytest -q
 ```
-Available once phase 0 creates the uv project. See `docs/test-procedure.md`.
+See `docs/test-procedure.md`.
 
 ## Conventions applied
 - User-level rules: python, shell, yaml (`~/.claude/rules/`)

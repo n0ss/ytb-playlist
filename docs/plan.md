@@ -1,10 +1,10 @@
-# YouTube Playlist Archiver — Plan
+# ytb-playlist — Plan
 
 Nov 4, 2026 · @Yohan
 
 ## Summary and key decisions
 
-Build a Python 3.14 CLI (working name `ytarchive`) on uv + Typer, driving your installed yt-dlp as a subprocess, tagging with mutagen, and keeping the core GUI-agnostic so a Textual TUI and later a PySide6 app are thin shells. Profile: **full** (long-lived tool, future GUI, metadata pipeline).
+Build a Python 3.14 CLI (`ytb-playlist`) on uv + Typer, driving your installed yt-dlp as a subprocess, tagging with mutagen, and keeping the core GUI-agnostic so a Textual TUI and later a PySide6 app are thin shells. Profile: **full** (long-lived tool, future GUI, metadata pipeline).
 
 | Decision | Choice | Why |
 | --- | --- | --- |
@@ -46,7 +46,7 @@ Packaging trap for any GUI launched from Finder: macOS apps do not inherit your 
 Noun-light, verb-first commands; one playlist = one folder, in one format; every run is idempotent thanks to per-playlist state.
 
 ```text
-ytarchive
+ytb-playlist
 ├── doctor                     # check yt-dlp, ffmpeg, deno, versions, PATHs, write access
 ├── info    URL                # playlist title, id, count, date range; no download
 ├── fetch   URL... --format mp3|mp4 [--out DIR] [--items 1:10] [--dry-run]
@@ -65,8 +65,8 @@ Global: --config FILE  -v/-q  --no-color  --version
 
 | Concern | Choice |
 | --- | --- |
-| Config | TOML at `~/Library/Application Support/ytarchive/config.toml` (or XDG on Linux), overridable by `--config` and `YTARCHIVE_*` env vars |
-| Per-playlist state | `<playlist folder>/.ytarchive/` holding `archive.txt` (yt-dlp `--download-archive`), `*.info.json`, original thumbnails, `state.json`. `archive.txt` owns "downloaded"; `state.json` records "tagged" and failed items with reason and date, is written atomically (temp file, then rename), and anything in the archive but not tagged is retried. Permanent failures (no compatible format, private, deleted) are skipped on later runs and listed in a summary without affecting the exit code; temporary or unrecognised failures are retried and exit 1; `sync --retry-failed` retries everything |
+| Config | TOML at `~/Library/Application Support/ytb-playlist/config.toml` (or XDG on Linux), overridable by `--config` and `YTB_PLAYLIST_*` env vars |
+| Per-playlist state | `<playlist folder>/.ytb-playlist/` holding `archive.txt` (yt-dlp `--download-archive`), `*.info.json`, original thumbnails, `state.json`. `archive.txt` owns "downloaded"; `state.json` records "tagged" and failed items with reason and date, is written atomically (temp file, then rename), and anything in the archive but not tagged is retried. Permanent failures (no compatible format, private, deleted) are skipped on later runs and listed in a summary without affecting the exit code; temporary or unrecognised failures are retried and exit 1; `sync --retry-failed` retries everything |
 | Folder lookup | Always by `* [<playlist_id>]`, never rebuilt from the current title, so a playlist renamed on YouTube keeps its folder and state. Two matching folders stop the run with an error listing both |
 | Format changes | The format is fixed per playlist; `fetch` refuses a different format on an existing playlist, because the archive tracks IDs, not formats |
 | URL handling | Normalised before use: tracking parameters stripped, `youtube.com/show/VL<id>` rewritten to `playlist?list=<id>` (yt-dlp gets HTTP 400 on the `/show/` form) |
@@ -77,7 +77,7 @@ Global: --config FILE  -v/-q  --no-color  --version
 Module layout the CLI sits on:
 
 ```text
-src/ytarchive/
+src/ytb_playlist/
   cli/        # Typer app, one module per command, Rich rendering
   core/       # sync engine, events, models (pydantic or dataclasses)
   backends/   # ytdlp_proc.py behind a small Protocol; tests replay recorded output
@@ -113,10 +113,10 @@ docs/
 
 ```bash
 # regenerate CLI reference (Typer built-in)
-uv run typer ytarchive.cli.app utils docs --name ytarchive --output docs/reference/cli.md
+uv run typer ytb_playlist.cli.app utils docs --name ytb-playlist --output docs/reference/cli.md
 ```
 
-A test fails if `docs/reference/cli.md` is stale (regenerate in a temp file and diff), so help text and docs cannot drift. Shell completion: `ytarchive --install-completion zsh`.
+A test fails if `docs/reference/cli.md` is stale (regenerate in a temp file and diff), so help text and docs cannot drift. Shell completion: `ytb-playlist --install-completion zsh`.
 
 ## Naming convention
 
@@ -184,7 +184,7 @@ MP3: `-x --audio-format mp3 --audio-quality 0` (VBR V0). Note that YouTube audio
 Let yt-dlp fetch the best thumbnail and convert it to JPEG, then crop and embed it ourselves: square for MP3 (album art grid), 16:9 untouched for MP4 (video poster).
 
 1. **Fetch:** `--write-thumbnail --convert-thumbnails jpg` (YouTube often serves WebP, which ID3 APIC and MP4 covr don't reliably accept). yt-dlp picks the highest-preference thumbnail from the info dict, usually `maxresdefault` (1280×720, or 1920×1080 as on the test playlist); fall back to `hqdefault` (480×360) when absent.
-2. **Store:** original kept in `.ytarchive/thumbs/<id>.jpg` so re-tagging never refetches.
+2. **Store:** original kept in `.ytb-playlist/thumbs/<id>.jpg` so re-tagging never refetches.
 3. **Transform (Pillow, `cover.py`):**
    - MP3, mode `square` (default): centre crop to the shorter side, capped at 1000×1000, never upscaling. Mode `pad`: 16:9 image letterboxed on a blurred square background, for thumbnails with text at the edges.
    - MP4, mode `wide`: keep the source size.
@@ -207,7 +207,7 @@ Eight small phases (0–7, with phase 1 in two parts), each ending with a test t
 
 | # | Phase | Deliverable | Done when (test) |
 | --- | --- | --- | --- |
-| 0 | Bootstrap | Project files from `/project-bootstrap`, uv project, `src/` layout, ruff, pytest, local `git init` on your go-ahead. Open checks: yt-dlp CVE IDs, how `ytarchive` gets on PATH | `uv run pytest` green on an empty test; `ruff check` clean |
+| 0 | Bootstrap | Project files from `/project-bootstrap`, uv project, `src/` layout, ruff, pytest, local `git init` on your go-ahead. Open checks done: decisions 15 and 16 | `uv run pytest` green on an empty test; `ruff check` clean |
 | 1a | Tool spikes (Claude) | `spikes/` scripts: thumbnail sizes; clipped download with `--download-sections`; progress parsing and failure handling from `--progress-template` and exit codes | One entry per spike in `docs/tech-decisions.md` |
 | 1b | Music.app spikes (you and Claude) | v2.3 vs v2.4; whether Music.app re-reads changed tags after import; how it displays the date; avc1 MP4 import; episode vs playlist cover | One entry per spike in `docs/tech-decisions.md` |
 | 2 | Deps + config + `doctor` | Minimal `config.py` (load, binary paths), binary discovery, version checks, `doctor` command | Unit tests with faked PATH; config load tests; `doctor` exit 3 when yt-dlp or deno missing; notice when yt-dlp differs from the last version the network test passed |
@@ -234,7 +234,7 @@ Test pyramid: \~80 % unit (pure functions: naming, mapping, config), \~15 % comp
 | YouTube changes break extraction | Downloads fail without warning | `doctor` shows yt-dlp age; documented update path (`brew upgrade yt-dlp`) |
 | `brew upgrade` changes yt-dlp behaviour | No lockfile protects the tool; offline tests won't notice | The network test records the last yt-dlp version it passed; `doctor` flags any other installed version so you know to re-run it |
 | Bot checks / rate limiting | 403s, "sign in to confirm" | Sleep intervals, small batches; cookies only on explicit flag, and only from a throwaway account (account flagging risk) |
-| yt-dlp security issues (several 2026 CVEs, e.g. filename sanitisation, `--write-link`; IDs to confirm in phase 0) | Code execution / odd files | Stay current; run yt-dlp with argument lists only, never pass metadata into `--exec` or shell strings; yt-dlp downloads to a temp folder as `%(id)s.%(ext)s`, and `naming.py` sets the final name |
+| yt-dlp security issues (2026: CVE-2026-26331, CVE-2026-50019, CVE-2026-50023, CVE-2026-50574, CVE-2026-55404, GHSA-69qj-pvh9-c5wg, all fixed by 2026.7.4; see decision 15) | Code execution / odd files | Stay current; run yt-dlp with argument lists only, never pass metadata into `--exec` or shell strings; yt-dlp downloads to a temp folder as `%(id)s.%(ext)s`, and `naming.py` sets the final name |
 | yt-dlp/Deno/ffmpeg missing when launched from a GUI | Silent format loss | Absolute paths in config, checked at startup |
 | Copyright / YouTube ToS | Legal exposure | Private personal use only, including third-party content such as the test playlist; YouTube's terms restrict downloading regardless; no redistribution features; media files are never committed |
 | Double lossy MP3 | Audible artefacts on some sources | Document it; consider AAC option later |
@@ -259,9 +259,9 @@ Users: me, on a MacBook M4 (macOS, Apple silicon).
 Profile: full.
 Stack: Python 3.14, uv, Typer 0.27.x + Rich, mutagen 1.48.x, Pillow, pytest, ruff. System deps (Homebrew): yt-dlp (run as a subprocess), ffmpeg, deno.
 Repo: local git, no remote until v0.1.0, then GitLab. Never commit without my go-ahead. One branch per phase, one commit per completed task.
-Layout: src/ytarchive/{cli,core,backends,tagging}/, urls.py, naming.py, cover.py, config.py, deps.py; tests/{unit,component,network}/ + fixtures/; docs/ (tech-decisions.md, test-procedure.md, how-to/, reference/); spikes/.
+Layout: src/ytb_playlist/{cli,core,backends,tagging}/, urls.py, naming.py, cover.py, config.py, deps.py; tests/{unit,component,network}/ + fixtures/; docs/ (tech-decisions.md, test-procedure.md, how-to/, reference/); spikes/.
 Skills: catalog base set (superpowers, task-observer, hookify, security-guidance, claude-md-management, context7, project-bootstrap, thermo-nuclear-code-quality-review). No repo-scope entries. No skill search.
-Conventions: filename '<YYYY-MM-DD> - <Title> [<id>].<ext>' in '<Playlist> [<playlist_id>]/'; date = release_date else upload_date, no time suffix; state in '<playlist>/.ytarchive/'; folder found by playlist ID; one format per playlist.
+Conventions: filename '<YYYY-MM-DD> - <Title> [<id>].<ext>' in '<Playlist> [<playlist_id>]/'; date = release_date else upload_date, no time suffix; state in '<playlist>/.ytb-playlist/'; folder found by playlist ID; one format per playlist.
 Tags: artist = channel (minus " - Topic"); album artist = playlist owner; album = config override else playlist title; title = '<YYYY-MM-DD> - <Title>'; track = playlist position, no total.
 Test playlist: https://www.youtube.com/playlist?list=PL9wDNu3ZrVQ63LOO81qh8-Ycq6-vIEqcg (83 long episodes: network tests use 3 clipped items).
 Each phase: own branch, thermo-nuclear review of the whole branch before asking to merge.
@@ -269,7 +269,7 @@ Full plan: docs/plan.md (move this plan file there).
 Decisions: seed docs/tech-decisions.md with the decisions from the Nov 4, 2026 plan review, each with its reason; the first CHANGELOG entry links to it.
 .gitignore: also *.mp3, *.mp4, *.m4a, *.webm, *.part, .ruff_cache/, .venv/. Recorded info.json fixtures stay tracked, scrubbed of personal fields.
 Plan with tests:
-0 Bootstrap: uv project, ruff, pytest, git init on go-ahead; check CVE IDs, how ytarchive gets on PATH → empty test green.
+0 Bootstrap: uv project, ruff, pytest, git init on go-ahead; check CVE IDs, how ytb-playlist gets on PATH → empty test green.
 1a Tool spikes: thumbnails, clipped download, progress and failure parsing → entries in docs/tech-decisions.md.
 1b Music.app spikes: ID3 v2.3 vs v2.4, tag re-reading, date display, avc1 MP4 import, episode vs playlist cover → entries in docs/tech-decisions.md.
 2 minimal config + deps + doctor → faked-PATH unit tests, config load tests, exit 3 without yt-dlp or deno.

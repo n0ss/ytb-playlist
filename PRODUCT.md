@@ -1,4 +1,4 @@
-# YouTube Playlist Archiver — product
+# ytb-playlist — product
 
 | | |
 |---|---|

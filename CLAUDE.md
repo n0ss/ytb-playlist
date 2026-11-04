@@ -1,18 +1,17 @@
-# YouTube Playlist Archiver (`ytarchive`)
+# ytb-playlist
 
 **Goal:** CLI (later GUI) that downloads YouTube playlists through yt-dlp into one folder per playlist, as MP3 or MP4, named by date and fully tagged for Apple Music import.
 Product details: `PRODUCT.md`. Decisions: `docs/tech-decisions.md`. Tests: `docs/test-procedure.md`. Full plan: `docs/plan.md`.
 
 ## Target architecture
-- `src/ytarchive/core/`: sync engine, models, typed events. GUI-agnostic: `sync(playlist, options, on_event)`.
-- `src/ytarchive/cli/`: Typer app, renders events with Rich. Textual, then PySide6, come later as thin shells on the same events.
-- `src/ytarchive/backends/ytdlp_proc.py`: runs the Homebrew `yt-dlp` as a subprocess. The `Backend` protocol exists only as the test seam.
+- `src/ytb_playlist/core/`: sync engine, models, typed events. GUI-agnostic: `sync(playlist, options, on_event)`.
+- `src/ytb_playlist/cli/`: Typer app, renders events with Rich. Textual, then PySide6, come later as thin shells on the same events.
+- `src/ytb_playlist/backends/ytdlp_proc.py`: runs the Homebrew `yt-dlp` as a subprocess. The `Backend` protocol exists only as the test seam.
 - `urls.py`, `naming.py`, `cover.py`, `config.py`, `deps.py`, `tagging/`: pure or narrow modules.
 - Downloads go to a temp folder as `%(id)s.%(ext)s`; `naming.py` sets the final name, then mutagen and Pillow tag from the saved `.info.json`.
-- Per-playlist state lives in `<playlist>/.ytarchive/`. `archive.txt` owns "downloaded"; `state.json` owns "tagged" and failures.
+- Per-playlist state lives in `<playlist>/.ytb-playlist/`. `archive.txt` owns "downloaded"; `state.json` owns "tagged" and failures.
 
 ## Commands
-Not available until phase 0 creates the uv project.
 ```bash
 uv run pytest -q              # offline tests
 uv run pytest -m network -q   # opt-in, uses the test playlist

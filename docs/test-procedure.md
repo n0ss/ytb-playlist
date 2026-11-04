@@ -1,7 +1,5 @@
 # Test procedure
 
-Available once phase 0 creates the uv project.
-
 ## Automated
 ```bash
 uv run pytest -q              # offline: unit and component tests from recorded fixtures

@@ -73,3 +73,18 @@
 ## 14. 2026-11-04 — Use of third-party content
 - **Decision:** private personal use only, with no redistribution features, and media files are never committed.
 - **Why:** the test playlist is third-party content, and YouTube's terms restrict downloading regardless of use. This records the risk, and doesn't remove it.
+
+## 15. 2026-11-04 — yt-dlp security baseline
+- **Decision:** treat 2026.10.26 as the current baseline. GitHub's advisories and NVD agree on the five 2026 CVEs: CVE-2026-26331, CVE-2026-50019, CVE-2026-50023, CVE-2026-50574 and CVE-2026-55404. GitHub also lists GHSA-69qj-pvh9-c5wg, with no CVE. All are fixed by 2026.7.4.
+- **Why:** the plan cited these without IDs. The design also avoids the affected paths: no `--exec`, `--netrc-cmd`, `--write-link`, or external downloaders such as aria2c and curl, and `naming.py` sets final filenames.
+- **Also checked:** yt-dlp's 2026.10.26 changelog names two critical dependency advisories, GHSA-9v8h-qqgm-4m35 (`brotli`, CVE-2026-111497) and GHSA-6q48-6c7w-9gw2 (`certifi`). Its note covers the release binaries, so the Homebrew environment was checked directly: `brotli` 1.2.1 and `certifi` 2026.10.23, both at or above the fixed versions. The project venv contains neither.
+
+## 16. 2026-11-04 — Installing the command
+- **Decision:** install with `uv tool install --editable .` once the CLI is useful, around phase 6. Until then, use `uv run ytb-playlist`.
+- **Why:** an editable install follows the source, which suits a one-user tool. `uv tool install --help` shows no `--locked` option, so this install resolves from `pyproject.toml`, not `uv.lock`. That matters less now that yt-dlp isn't a Python dependency.
+- **Alternatives considered:** wrapper script; a standalone build.
+
+## 17. 2026-11-04 — Project name
+- **Decision:** rename the project `ytb-playlist`: folder, distribution and command `ytb-playlist`, Python module `ytb_playlist`, per-playlist state in `.ytb-playlist/`, environment prefix `YTB_PLAYLIST_`.
+- **Why:** owner's choice. Hyphens aren't valid in Python module names, hence the underscore.
+- **Alternatives considered:** `ytarchive`, the working name.
