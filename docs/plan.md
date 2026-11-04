@@ -69,7 +69,7 @@ Global: --config FILE  -v/-q  --no-color  --version
 | Per-playlist state | `<playlist folder>/.ytb-playlist/` holding `archive.txt` (yt-dlp `--download-archive`), `*.info.json`, original thumbnails, `state.json`. `archive.txt` owns "downloaded"; `state.json` records "tagged" and failed items with reason and date, is written atomically (temp file, then rename), and anything in the archive but not tagged is retried. Permanent failures (no compatible format, private, deleted) are skipped on later runs and listed in a summary without affecting the exit code; temporary or unrecognised failures are retried and exit 1; `sync --retry-failed` retries everything |
 | Folder lookup | Always by `* [<playlist_id>]`, never rebuilt from the current title, so a playlist renamed on YouTube keeps its folder and state. Two matching folders stop the run with an error listing both |
 | Format changes | The format is fixed per playlist; `fetch` refuses a different format on an existing playlist, because the archive tracks IDs, not formats |
-| URL handling | Normalised before use: tracking parameters stripped, `youtube.com/show/VL<id>` rewritten to `playlist?list=<id>` (yt-dlp gets HTTP 400 on the `/show/` form) |
+| URL handling | Normalised before use: tracking parameters stripped, `youtube.com/show/VL<id>` rewritten to `playlist?list=<id>` (yt-dlp gets HTTP 400 on the `/show/` form); URLs with no playlist, non-YouTube URLs and auto-mixes (`list=RD…`) are rejected |
 | Exit codes | 0 ok · 1 partial (some items failed) · 2 usage error · 3 missing dependency · 4 network/extractor error |
 | Safety | `--dry-run` on every write command; never delete user files; `rename` writes an undo log |
 | Politeness | Default `sleep_interval` 3–8 s between items, configurable; no cookies unless `--cookies-from-browser` is passed explicitly |
@@ -130,9 +130,9 @@ Music/YouTube/Lofi Sessions [PLx9a…]/2025-03-14 - Rainy Night Mix [dQw4w9WgXcQ
 | Element | Source field | Rule |
 | --- | --- | --- |
 | Date | `release_date`, else `upload_date` | `release_date` is the premiere/live air date; `upload_date` otherwise. Missing → `0000-00-00` so it sorts first and is visible. `upload_date` is the date YouTube shows on the video page. It can differ from the broadcast date (3 days later on all 7 test-playlist items compared); accepted for v1 |
-| Title | `title` | NFC-normalised; `"` removed; `/ \ :` become ` - `; `* ? < > \|` removed; double spaces collapsed; trailing dots/spaces stripped; truncated so the full name stays ≤ 200 bytes (APFS limit is 255 bytes UTF-8) |
+| Title | `title` | NFC-normalised; `"` removed; `/ \ :` become ` - `; `* ? < > \|` removed; control characters removed; double spaces collapsed; leading and trailing dots/spaces stripped; `Untitled` if nothing is left; truncated so the full name stays ≤ 200 bytes (APFS limit is 255 bytes UTF-8) |
 | Separator | `-` | Readable; never appears inside the date |
-| ID | `id` | Always kept, in brackets |
+| ID | `id` | Always kept, in brackets; only letters, digits, `_` and `-`, otherwise the item stops with an error |
 | Folder | `playlist_title` + `playlist_id` | Title taken at creation; later runs find the folder by ID, so it survives playlist renames on YouTube |
 
 yt-dlp output template equivalent (useful for the first spike, before `naming.py` owns it):

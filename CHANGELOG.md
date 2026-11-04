@@ -8,3 +8,4 @@
 - Phase 1a: tool spikes in `spikes/` for thumbnails, clipped download, progress and failures. See decisions [18](docs/tech-decisions.md), [19](docs/tech-decisions.md) and [20](docs/tech-decisions.md).
 - Phase 1b: Music.app import checked by the owner; ID3v2.3 kept and the MP4 media kind dropped. See [decision 21](docs/tech-decisions.md).
 - Phase 2: `doctor` command, minimal config and binary discovery. See [decision 22](docs/tech-decisions.md).
+- Phase 3: file and folder naming, and playlist URL normalisation. See [decision 23](docs/tech-decisions.md).
