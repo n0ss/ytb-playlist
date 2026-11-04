@@ -10,7 +10,7 @@
 | Operating context | Runs by hand from the terminal; files go to `~/Music/YouTube` |
 
 ## Capabilities
-Planned for v0.1.0. Only `doctor` is built so far.
+Planned for v0.1.0. Built so far: `doctor`, `info` and untagged `fetch`.
 - Download a playlist as MP3 or MP4 into its own folder, one format per playlist.
 - Re-run safely: only new items download, and untagged items are retried.
 - Name files by the date YouTube shows, so Finder sorts them by date.

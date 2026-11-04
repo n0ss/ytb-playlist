@@ -48,7 +48,7 @@ Noun-light, verb-first commands; one playlist = one folder, in one format; every
 ```text
 ytb-playlist
 ├── doctor                     # check yt-dlp, ffmpeg, deno, versions, PATHs, write access
-├── info    URL                # playlist title, id, count, date range; no download
+├── info    URL                # playlist title, id, count; no download
 ├── fetch   URL... --format mp3|mp4 [--out DIR] [--items 1:10] [--dry-run]
 ├── sync    [NAME|--all] [--retry-failed]   # re-run saved playlists, download only new entries
 ├── playlist

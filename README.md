@@ -27,8 +27,10 @@ brew install yt-dlp deno ffmpeg uv   # whatever is missing
 ## Usage
 ```bash
 uv run ytb-playlist doctor   # check yt-dlp, ffmpeg, deno and the output folder
+uv run ytb-playlist info URL # playlist title, ID and item count
+uv run ytb-playlist fetch URL --format mp3 --items 1:3 --dry-run
 ```
-More commands arrive with phases 4 to 6. The planned interface is in `docs/plan.md`.
+Files aren't tagged until phase 5. More commands arrive with phases 5 and 6. The planned interface is in `docs/plan.md`.
 
 ## Tests
 ```bash

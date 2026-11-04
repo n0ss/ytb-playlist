@@ -9,3 +9,4 @@
 - Phase 1b: Music.app import checked by the owner; ID3v2.3 kept and the MP4 media kind dropped. See [decision 21](docs/tech-decisions.md).
 - Phase 2: `doctor` command, minimal config and binary discovery. See [decision 22](docs/tech-decisions.md).
 - Phase 3: file and folder naming, and playlist URL normalisation. See [decision 23](docs/tech-decisions.md).
+- Phase 4: `info` and `fetch` commands, on the fetch engine and yt-dlp backend. See [decision 24](docs/tech-decisions.md).
