@@ -93,6 +93,9 @@ def _fetch_one(url: str, options: FetchOptions, backend: Backend) -> int:
         except NETWORK_ERRORS as error:
             common.print_error(error)
             return exit_codes.NETWORK_ERROR
+        except OSError as error:
+            common.print_error(error)
+            return exit_codes.MISSING_DEPENDENCY
     return exit_codes.PARTIAL if renderer.partial else 0
 
 

@@ -69,7 +69,7 @@ def load_state(folder: Path) -> PlaylistState | None:
     if not path.exists():
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         if data["version"] != STATE_VERSION:
             raise ValueError(f"unknown version {data['version']}")
         return PlaylistState(
@@ -98,7 +98,7 @@ def save_state(folder: Path, state: PlaylistState) -> None:
     }
     file_descriptor, temp_name = tempfile.mkstemp(dir=state_dir, prefix=f"{STATE_FILE}.")
     try:
-        with os.fdopen(file_descriptor, "w") as file:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=2, ensure_ascii=False)
             file.flush()
             os.fsync(file.fileno())

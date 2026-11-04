@@ -129,6 +129,26 @@ def test_missing_tool_exits_3(install_tools, out: Path) -> None:
     assert "ffmpeg" in result.stderr
 
 
+def test_output_root_that_is_a_file_exits_3(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend(("a",)))
+    out.write_text("a file, not a folder")
+    result = fetch_cli(out)
+    assert result.exit_code == 3
+    assert "Not a directory" in result.stderr
+
+
+def test_full_disk_exits_3(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    use(monkeypatch, FakeBackend(("a",)))
+
+    def full(*_: object) -> None:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr("ytb_playlist.core.fetch.save_state", full)
+    result = fetch_cli(out)
+    assert result.exit_code == 3
+    assert "No space left" in result.stderr
+
+
 def test_format_is_required(out: Path) -> None:
     result = runner.invoke(app, ["fetch", URL, "--out", str(out)])
     assert result.exit_code == 2

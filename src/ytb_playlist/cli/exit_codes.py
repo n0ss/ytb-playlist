@@ -3,5 +3,6 @@
 
 PARTIAL = 1
 USAGE_ERROR = 2
+# Also an output folder that can't be used: this machine isn't ready (decision 22).
 MISSING_DEPENDENCY = 3
 NETWORK_ERROR = 4

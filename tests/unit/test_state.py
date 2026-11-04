@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -153,3 +156,19 @@ def test_permanent_failures_are_listed_and_temporary_ones_are_not() -> None:
     state.failures["gone"] = failure(FailureKind.PERMANENT)
     state.failures["flaky"] = failure(FailureKind.TEMPORARY)
     assert state.permanent_failures() == {"gone"}
+
+
+def test_state_is_utf8_under_a_latin1_locale(tmp_path: Path) -> None:
+    script = f"""
+from pathlib import Path
+from ytb_playlist.core.models import Failure, FailureKind, MediaFormat
+from ytb_playlist.core.state import PlaylistState, load_state, save_state
+state = PlaylistState("PL", MediaFormat.MP3)
+state.failures["a"] = Failure(FailureKind.PERMANENT, "\u00e9t\u00e9", "2026-11-04")
+save_state(Path({str(tmp_path)!r}), state)
+assert load_state(Path({str(tmp_path)!r})) == state
+"""
+    env = os.environ | {"PYTHONUTF8": "0", "LC_ALL": "en_US.ISO8859-1", "PYTHONCOERCECLOCALE": "0"}
+    subprocess.run([sys.executable, "-c", script], env=env, check=True)
+    saved = (tmp_path / ".ytb-playlist" / "state.json").read_bytes()
+    assert "\u00e9t\u00e9" in saved.decode("utf-8")

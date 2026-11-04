@@ -307,6 +307,31 @@ def test_damaged_metadata_fails_the_item_and_keeps_the_file(run: Run) -> None:
     assert (run.folder / ".ytb-playlist" / "tmp" / "a.mp3").exists()
 
 
+def test_unexpected_extension_is_refused_as_permanent(run: Run) -> None:
+    class WrongFormat(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            yield DownloadSaved("a", write_item(request.work_dir, "a", "webm"))
+
+    events = run(WrongFormat(("a",)))
+    assert of_type(events, ItemFailed)[0].kind == FailureKind.PERMANENT
+    assert events[-1] == FetchDone(saved=0, failed=0, skipped=1)
+    assert run.media() == []
+    assert (run.folder / ".ytb-playlist" / "tmp" / "a.webm").exists()
+
+
+def test_thumbnail_that_was_not_converted_is_kept(run: Run) -> None:
+    class Unconverted(FakeBackend):
+        def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+            media = write_item(request.work_dir, "a")
+            (request.work_dir / "a.jpg").rename(request.work_dir / "a.webp")
+            yield DownloadSaved("a", media)
+
+    run(Unconverted(("a",)))
+    state_dir = run.folder / ".ytb-playlist"
+    assert (state_dir / "thumbs" / "a.webp").read_bytes() == b"jpeg"
+    assert not (state_dir / "tmp").exists()
+
+
 def test_saved_path_outside_the_work_folder_is_refused(run: Run, tmp_path: Path) -> None:
     outside = tmp_path / "secret.mp3"
     outside.write_bytes(b"not ours")

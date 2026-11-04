@@ -46,6 +46,7 @@ from ytb_playlist.urls import playlist_url
 ARCHIVE_FILE = "archive.txt"
 WORK_DIR = "tmp"
 THUMBNAIL_DIR = "thumbs"
+THUMBNAIL_SUFFIXES = (".jpg", ".webp", ".png")
 ITEM_RANGE = re.compile(r"(\d+)(?::(\d+))?")
 
 
@@ -77,7 +78,9 @@ def _read_archive(path: Path) -> set[str]:
     if not path.exists():
         return set()
     return {
-        line.split()[-1] for line in path.read_text(errors="replace").splitlines() if line.strip()
+        line.split()[-1]
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.strip()
     }
 
 
@@ -106,6 +109,7 @@ class _Run:
         self,
         folder: Path,
         state: PlaylistState,
+        ext: str,
         on_event: Callable[[Event], None],
         today: date,
     ) -> None:
@@ -113,6 +117,7 @@ class _Run:
         self.state_dir = folder / STATE_DIR
         self.work = self.state_dir / WORK_DIR
         self.state = state
+        self.ext = ext
         self.on_event = on_event
         self.today = today.isoformat()
         self.saved = 0
@@ -121,10 +126,10 @@ class _Run:
         self.current: str | None = None
         self.tracker = _ProgressTracker()
 
-    def recover(self, archived: set[str], ext: str) -> None:
+    def recover(self, archived: set[str]) -> None:
         """Yt-dlp records an item before we move it, so a crash can strand a finished file."""
         for video_id in sorted(archived):
-            media = self.work / f"{video_id}.{ext}"
+            media = self.work / f"{video_id}.{self.ext}"
             if media.exists():
                 self._save(video_id, media)
 
@@ -156,6 +161,10 @@ class _Run:
         self.current = None
 
     def _save(self, video_id: str, media: Path) -> None:
+        if media.suffix != f".{self.ext}":
+            reason = f"expected a .{self.ext} file, got {media.name}"
+            self._fail(video_id, FailureKind.PERMANENT, reason)
+            return
         try:
             target = self._move_into_place(video_id, media)
         except (OSError, ValueError) as error:
@@ -170,7 +179,7 @@ class _Run:
         if not is_safe_id(video_id) or media.parent.resolve() != self.work.resolve():
             raise ValueError(f"unexpected file: {media}")
         info_path = self.work / f"{video_id}.info.json"
-        info = json.loads(info_path.read_text())
+        info = json.loads(info_path.read_text(encoding="utf-8"))
         if not isinstance(info, dict) or info.get("id") != video_id:
             raise ValueError(f"metadata doesn't match the item: {info_path}")
         target = self.folder / file_name(info, media.suffix.removeprefix("."))
@@ -179,11 +188,12 @@ class _Run:
         else:
             os.replace(media, target)
         os.replace(info_path, self.state_dir / info_path.name)
-        thumbnail = self.work / f"{video_id}.jpg"
-        if thumbnail.exists():
-            thumbnails = self.state_dir / THUMBNAIL_DIR
-            thumbnails.mkdir(exist_ok=True)
-            os.replace(thumbnail, thumbnails / thumbnail.name)
+        thumbnails = self.state_dir / THUMBNAIL_DIR
+        for suffix in THUMBNAIL_SUFFIXES:
+            thumbnail = self.work / f"{video_id}{suffix}"
+            if thumbnail.exists():
+                thumbnails.mkdir(exist_ok=True)
+                os.replace(thumbnail, thumbnails / thumbnail.name)
         return target
 
     def _fail(self, video_id: str, kind: FailureKind, reason: str) -> None:
@@ -200,13 +210,11 @@ class _Run:
             pass
 
 
-def _pending(
-    info: PlaylistInfo, selected: set[int], archived: set[str], skipped: set[str]
-) -> tuple[int, ...]:
+def _pending(info: PlaylistInfo, selected: set[int], done: set[str]) -> tuple[int, ...]:
     return tuple(
         position
         for position, video_id in enumerate(info.item_ids, start=1)
-        if video_id and position in selected and video_id not in archived | skipped
+        if video_id and position in selected and video_id not in done
     )
 
 
@@ -225,15 +233,16 @@ def fetch(
     state.require_format(options.format)
     selected = parse_items(options.items, info.item_count)
 
-    run = _Run(folder, state, on_event, today)
+    run = _Run(folder, state, options.format, on_event, today)
     archive = run.state_dir / ARCHIVE_FILE
     archived = _read_archive(archive)
     if not options.dry_run:
-        run.recover(archived, options.format)
+        run.recover(archived)
 
     item_ids = set(info.item_ids)
-    positions = _pending(info, selected, archived, state.permanent_failures())
-    on_event(FetchPlanned(folder, len(positions), len(state.permanent_failures() & item_ids)))
+    skipped = state.permanent_failures()
+    positions = _pending(info, selected, archived | skipped)
+    on_event(FetchPlanned(folder, len(positions), len(skipped & item_ids)))
     if options.dry_run:
         return
 
