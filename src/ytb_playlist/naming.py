@@ -37,7 +37,7 @@ def clean_title(title: object) -> str:
 
 def file_name(info: Mapping[str, object], ext: str) -> str:
     return _fit(
-        f"{_item_date(info)} - ",
+        f"{item_date(info)} - ",
         info.get("title"),
         f" [{_checked_id(info.get('id'))}].{ext}",
     )
@@ -53,7 +53,7 @@ def _checked_id(value: object) -> str:
     return str(value)
 
 
-def _item_date(info: Mapping[str, object]) -> str:
+def item_date(info: Mapping[str, object]) -> str:
     for field in ("release_date", "upload_date"):
         parsed = _parse_date(info.get(field))
         if parsed:
