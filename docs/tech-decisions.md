@@ -166,3 +166,8 @@
 - **Decision:** write the `APIC` frame with Latin-1 text encoding and an empty description. All other text frames stay UTF-16.
 - **Why:** files carrying the same image behaved differently in Music.app. UTF-16 picture frames, in v2.3 and v2.4, showed no cover. Latin-1 frames did, including one written by ffmpeg. Finder and AVFoundation read both, which is why the fault was invisible outside Music.app. Tested on macOS 15.7.7 with Music 1.5.6.
 - **Open question:** decision 21 recorded covers as working with a UTF-16 frame, and that doesn't fit this result. Its cause isn't known.
+
+## 31. 2026-11-04 — Age-restricted videos and the run summary
+- **Decision:** `Sign in to confirm your age` is a permanent failure. The end-of-run summary calls its count `permanent failures`, not `skipped`. The opening line keeps `skipped`, because it counts items that run leaves out.
+- **Why:** the tool has no cookies (decision 28), so a retry can't succeed, and a temporary failure would make every later run of the playlist exit 1. In the summary, `skipped` was wrong for items that were tried and failed during that run.
+- **Consequence:** if cookie support is added, these items need `--retry-failed`. `FetchDone.skipped` keeps its name, although it counts all of the playlist's permanent failures.

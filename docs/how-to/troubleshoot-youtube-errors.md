@@ -19,7 +19,7 @@ Yt-dlp exits with the same code for every failure, so this tool reads its error 
 
 | Kind | Examples | What happens |
 | --- | --- | --- |
-| Permanent | `This video is unavailable`, `Private video`, `Requested format is not available` | Skipped on later runs and counted as skipped. Exit code unaffected. |
+| Permanent | `This video is unavailable`, `Private video`, `Sign in to confirm your age`, `Requested format is not available` | Skipped on later runs and counted as a permanent failure. Exit code unaffected. |
 | Temporary | Timeouts, `HTTP Error 403`, bot checks, anything unrecognised | Retried on the next run. Exit code 1. |
 
 The reason and date for each failure are in `.ytb-playlist/state.json`. To try permanent failures again:
@@ -31,6 +31,8 @@ uv run ytb-playlist sync NAME --retry-failed
 ## Common messages
 
 **`Sign in to confirm you're not a bot`**: YouTube is limiting this connection. Wait, then retry in smaller batches with `--items 1:10`, or raise `sleep_min` and `sleep_max` in the config. This tool doesn't use browser cookies.
+
+**`Sign in to confirm your age`**: the video is age-restricted and needs a signed-in account. This tool doesn't use browser cookies, so it records a permanent failure and moves on.
 
 **`HTTP Error 403`**: often temporary. Run the same command again, because partial files resume. If it persists, upgrade yt-dlp.
 

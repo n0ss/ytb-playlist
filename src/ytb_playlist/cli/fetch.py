@@ -56,6 +56,10 @@ class Quality(StrEnum):
     MAX = "max"
 
 
+def _permanent_failures(count: int) -> str:
+    return f"{count} permanent failure{'' if count == 1 else 's'}"
+
+
 class _Renderer:
     def __init__(self, progress: Progress) -> None:
         self.progress = progress
@@ -89,13 +93,14 @@ class _Renderer:
                 )
             case FetchDone():
                 self.partial = event.failed > 0
+                permanent = _permanent_failures(event.skipped)
                 if event.saved or event.failed or self.tagged:
                     self._print(
                         f"{event.saved} saved, {self.tagged} tagged, "
-                        f"{event.failed} failed, {event.skipped} skipped"
+                        f"{event.failed} failed, {permanent}"
                     )
                 else:
-                    self._print(f"Nothing new, {event.skipped} skipped")
+                    self._print(f"Nothing new, {permanent}")
 
     def _print(self, message: str, style: str = "") -> None:
         self.progress.console.print(Text(message, style=style), soft_wrap=True)

@@ -305,3 +305,30 @@ def test_info_backend_error_exits_4(out: Path, monkeypatch: pytest.MonkeyPatch) 
 def test_info_missing_tool_exits_3(install_tools, out: Path) -> None:
     install_tools("yt-dlp")
     assert runner.invoke(app, ["info", URL]).exit_code == 3
+
+
+def permanent_failure(video_id: str) -> DownloadError:
+    return DownloadError(video_id, FailureKind.PERMANENT, "Private video")
+
+
+def test_summary_names_permanent_failures(out: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    failures = {"a": [permanent_failure("a")], "b": [permanent_failure("b")]}
+    use(monkeypatch, FakeBackend(("a", "b", "c"), failures))
+    assert "1 saved, 1 tagged, 0 failed, 2 permanent failures\n" in fetch_cli(out).output
+
+
+def test_summary_uses_the_singular_for_one_permanent_failure(
+    out: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use(monkeypatch, FakeBackend(("a", "b"), {"a": [permanent_failure("a")]}))
+    assert "0 failed, 1 permanent failure\n" in fetch_cli(out).output
+
+
+def test_rerun_with_nothing_new_names_permanent_failures(
+    out: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    use(monkeypatch, FakeBackend(("a", "b"), {"a": [permanent_failure("a")]}))
+    fetch_cli(out)
+    result = fetch_cli(out)
+    assert "1 skipped" in result.output
+    assert "Nothing new, 1 permanent failure\n" in result.output

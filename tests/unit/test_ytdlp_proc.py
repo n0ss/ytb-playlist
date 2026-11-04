@@ -90,6 +90,11 @@ def test_other_lines_are_ignored(line: str) -> None:
             "permanent",
         ),
         ("ERROR: [youtube] abc: Private video. Sign in", "abc", "permanent"),
+        (
+            "ERROR: [youtube] abc: Sign in to confirm your age. This video may be inappropriate",
+            "abc",
+            "permanent",
+        ),
         ("ERROR: [youtube] abc: Sign in to confirm you're not a bot", "abc", "temporary"),
         ("ERROR: [youtube] abc: Unable to download API page: timeout", "abc", "temporary"),
         ("ERROR: [youtube] abc: something nobody has seen", "abc", "temporary"),

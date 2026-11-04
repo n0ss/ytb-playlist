@@ -35,6 +35,7 @@ PERMANENT_ERRORS = (
     "this video is unavailable",
     "video unavailable",
     "private video",
+    "sign in to confirm your age",
     "requested format is not available",
     "has been removed",
     "account associated with this video has been terminated",

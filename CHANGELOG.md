@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- The end-of-run summary says `permanent failures` instead of `skipped`, and age-restricted videos count as permanent failures. See [decision 31](docs/tech-decisions.md).
+
 ## 0.1.1 (2026-11-04)
 - MP3 covers now show in Music.app: the picture frame uses Latin-1. See [decision 30](docs/tech-decisions.md).
 
