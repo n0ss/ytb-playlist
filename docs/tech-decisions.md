@@ -88,3 +88,21 @@
 - **Decision:** rename the project `ytb-playlist`: folder, distribution and command `ytb-playlist`, Python module `ytb_playlist`, per-playlist state in `.ytb-playlist/`, environment prefix `YTB_PLAYLIST_`.
 - **Why:** owner's choice. Hyphens aren't valid in Python module names, hence the underscore.
 - **Alternatives considered:** `ytarchive`, the working name.
+
+## 18. 2026-11-04 — Spike: thumbnails
+- **Decision:** read a cover's size from the saved file, never from the `.info.json`. Pass `--no-write-playlist-metafiles`, unless `cover = "playlist"` needs the playlist image.
+- **Why:** yt-dlp lists `maxresdefault.webp` as 1920×1080, but the file is 1280×720. All 3 items tested saved as 1280×720 JPEGs of about 86 KB, and the first item's `.webp` was also measured directly. That first item's `hqdefault` is 480×360 and `sddefault` 640×480, both 4:3. So the 1000×1000 square cover is about 720×720 on this playlist, because `cover.py` never upscales. The size budget of 500 KB is far from being reached.
+- **Also found:** `--write-thumbnail` also saves the playlist's own image, 336×188 on this playlist. That is very small for `cover = "playlist"`, so spike 1b should judge it at that size.
+
+## 19. 2026-11-04 — Spike: clipped download
+- **Decision:** the network test clips with `--download-sections "*0-60"` and must use its own throwaway archive, never a real playlist's `archive.txt`.
+- **Why:** on the first item, MP4 gave format `137+140` (H.264 1080p, AAC), 60.06 s, 15.3 MB in 40.7 s. MP3 gave 60.01 s, 1.4 MB in 38.1 s. The `%(id)s.%(ext)s` name is unchanged by clipping. A rerun exits 0 in 0.9 s and prints nothing, so an empty `--print after_move:` result means "nothing new". The archive line holds only the ID, so a clipped item looks fully downloaded and would never be fetched in full.
+- **Limit:** the 3-item run is still phase 4's job; this spike used one item.
+
+## 20. 2026-11-04 — Spike: progress and failures
+- **Decision:** parse progress from stdout lines with our own prefix, and report the final path with `--print after_move:`. Compute percent from `downloaded_bytes` and `total_bytes_estimate`, capped so it never moves backwards. Classify failures from the `ERROR:` text on stderr, with unknown text treated as transient. Treat an empty result from a playlist or range as an explicit outcome, not as success.
+- **Why, progress:** on the sampled HLS audio format, `total_bytes` is `NA` until the `finished` line, the estimate moves, and `_percent` jumps from 100 to 0.26 in the first lines. `--print` and `--progress-template download:` share stdout, but the `postprocess:` template lines arrive on stderr. With `--download-sections`, yt-dlp hands over to ffmpeg: one `finished` line, and ffmpeg's own output, so clipped runs show no live progress.
+- **Why, failures:** every failure tested exits 1: missing video, missing playlist, no compatible format, network down, and a batch with one bad item. So the exit code can't separate permanent from transient. A batch still processes its good items and exits 1, unless `--abort-on-error` is passed. A range past the end of a playlist exits 0 with no output. A missing playlist shows as `HTTP Error 400`, which reads like a transient error, so the classifier needs a test case for it.
+- **Interrupts:** `SIGTERM` exits -15 and leaves `.part`, `.part-Frag6` and `.ytdl` files, which supports the temp-folder download.
+- **Not tested:** two-stream MP4 progress, which should restart per stream, and resuming from `.part` files. Phase 4 covers both. The error strings belong to yt-dlp and can change, so `tests/fixtures/` will record them.
+- **Also found:** YouTube warns that 2 unavailable videos are hidden on the test playlist, so a listing can silently omit items.

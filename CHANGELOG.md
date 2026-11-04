@@ -5,3 +5,4 @@
 - Plan reviewed and moved to `docs/plan.md`. See decisions [2](docs/tech-decisions.md) to [14](docs/tech-decisions.md).
 - Phase 0: uv project on Python 3.14, runtime and development dependencies, pytest and ruff configured. Security check in [decision 15](docs/tech-decisions.md), install method in [decision 16](docs/tech-decisions.md).
 - Project renamed `ytb-playlist`. See [decision 17](docs/tech-decisions.md).
+- Phase 1a: tool spikes in `spikes/` for thumbnails, clipped download, progress and failures. See decisions [18](docs/tech-decisions.md), [19](docs/tech-decisions.md) and [20](docs/tech-decisions.md).

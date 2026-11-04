@@ -9,6 +9,7 @@ PRODUCT.md            what the tool is for and its constraints
 CHANGELOG.md
 pyproject.toml        uv project, dependencies, pytest and ruff settings
 src/ytb_playlist/     the package
+spikes/               throwaway experiments behind decisions 18 to 20
 docs/
   plan.md             full plan and phases
   tech-decisions.md   every decision, with its reason
