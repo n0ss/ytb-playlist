@@ -112,7 +112,7 @@ docs/
 
 ```bash
 # regenerate CLI reference (Typer built-in)
-uv run typer ytb_playlist.cli.app utils docs --name ytb-playlist --output docs/reference/cli.md
+uv run python -m typer ytb_playlist.cli.app utils docs --name ytb-playlist --output docs/reference/cli.md
 ```
 
 A test fails if `docs/reference/cli.md` is stale (regenerate in a temp file and diff), so help text and docs cannot drift. Shell completion: `ytb-playlist --install-completion zsh`.
