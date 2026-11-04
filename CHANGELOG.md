@@ -11,3 +11,4 @@
 - Phase 3: file and folder naming, and playlist URL normalisation. See [decision 23](docs/tech-decisions.md).
 - Phase 4: `info` and `fetch` commands, on the fetch engine and yt-dlp backend. See [decision 24](docs/tech-decisions.md).
 - Project licensed under the GNU GPL v3.0. See [decision 25](docs/tech-decisions.md).
+- Repository hosted publicly on GitHub, ahead of v0.1.0. See [decision 26](docs/tech-decisions.md).

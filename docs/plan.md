@@ -15,7 +15,7 @@ Build a Python 3.14 CLI (`ytb-playlist`) on uv + Typer, driving your installed y
 | CLI | Typer 0.27.x + Rich | Type-hint CLI, completion, `--help` generated from code |
 | Tagging | mutagen 1.48.x, own tagging pass after yt-dlp | Full control of ID3v2.3 frames and MP4 atoms for Apple Music |
 | Images | Pillow | Square crop / resize of covers |
-| VCS | Local git, no remote until v0.1.0, then GitLab; one commit per completed task, each on your go-ahead; one branch per phase | Each branch gives the thermo-nuclear review a diff to work from |
+| VCS | Git with a public GitHub remote (decision 26); one commit per completed task, each on your go-ahead; one branch per phase | Each branch gives the thermo-nuclear review a diff to work from |
 
 Prerequisites check on the M4:
 
@@ -70,7 +70,7 @@ Global: --config FILE  -v/-q  --no-color  --version
 | Folder lookup | Always by `* [<playlist_id>]`, never rebuilt from the current title, so a playlist renamed on YouTube keeps its folder and state. Two matching folders stop the run with an error listing both |
 | Format changes | The format is fixed per playlist; `fetch` refuses a different format on an existing playlist, because the archive tracks IDs, not formats |
 | URL handling | Normalised before use: tracking parameters stripped, `youtube.com/show/VL<id>` rewritten to `playlist?list=<id>` (yt-dlp gets HTTP 400 on the `/show/` form); URLs with no playlist, non-YouTube URLs and auto-mixes (`list=RD…`) are rejected |
-| Exit codes | 0 ok · 1 partial (some items failed) · 2 usage error · 3 missing dependency · 4 network/extractor error |
+| Exit codes | 0 ok · 1 partial (some items failed) · 2 usage error · 3 missing dependency or unusable output folder · 4 network/extractor error |
 | Safety | `--dry-run` on every write command; never delete user files; `rename` writes an undo log |
 | Politeness | Default `sleep_interval` 3–8 s between items, configurable; no cookies unless `--cookies-from-browser` is passed explicitly |
 

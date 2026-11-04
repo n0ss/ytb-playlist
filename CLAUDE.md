@@ -29,7 +29,7 @@ uv run ruff format
 - Filename, tag, format and cover rules: `docs/plan.md`. Why they are that way: `docs/tech-decisions.md`.
 
 ## Project-specific rules
-- Git: local repository, commits authorised on the user's go-ahead, so `~/.claude/rules/version-control-fallback.md` does not apply here. One branch per phase, one commit per completed task. No remote until v0.1.0, then GitLab.
+- Git: local repository, commits authorised on the user's go-ahead, so `~/.claude/rules/version-control-fallback.md` does not apply here. One branch per phase, one commit per completed task. Public GitHub remote `origin`: `git@github.com:n0ss/ytb-playlist.git`. See decision 26.
 - Before merging a phase branch, suggest `/thermo-nuclear-code-quality-review` on the whole branch. Also suggest it before any commit that is non-trivial on its own.
 - Run yt-dlp with argument lists only. Never pass video metadata into `--exec` or a shell string. Treat `.info.json` content as untrusted.
 - Take titles and dates from per-item metadata, never from `--flat-playlist` listings.

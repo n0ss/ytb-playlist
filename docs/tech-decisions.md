@@ -137,3 +137,8 @@
 - **Decision:** GNU General Public License v3.0 only (`GPL-3.0-only`), with the full text in `LICENSE`, the expression in `pyproject.toml`, and an SPDX identifier in each Python file.
 - **Why:** owner's choice. It also fits the dependencies: mutagen is GPL-licensed, and the permissive licences of Typer, Rich and Pillow are compatible. yt-dlp, ffmpeg and deno run as separate programs.
 - **Limit:** the licence covers this project's own work. It doesn't cover the third-party metadata in `tests/fixtures/`.
+
+## 26. 2026-11-04 — Public GitHub repository
+- **Decision:** host the project publicly on GitHub at `n0ss/ytb-playlist`, now rather than at v0.1.0. This replaces the GitLab plan in decision 4 and the "code exists only on this Mac" risk recorded there. Commits use the owner's chosen public address.
+- **Why:** owner's choice.
+- **Accepted risk:** publishing a downloader goes further than the private use in decision 14, whose terms risk still applies to how the tool is used. Commit history and `tests/fixtures/`, which holds a third-party title and description, are public too. Nothing downloaded is ever committed.

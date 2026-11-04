@@ -6,7 +6,7 @@
 | Stack | Python 3.14, uv, Typer + Rich, mutagen, Pillow; Homebrew yt-dlp, ffmpeg, deno |
 | Users | One: the owner |
 | Purpose | Keep YouTube playlists as local files, ready to import into Apple Music |
-| Positioning | Personal tool, not a distributed product |
+| Positioning | Personal tool, published as open source under the GPL |
 | Operating context | Runs by hand from the terminal; files go to `~/Music/YouTube` |
 
 ## Capabilities
