@@ -156,3 +156,8 @@
 - **Left out:** `config edit`, `-v`, `-q`, `--no-color` and `--cookies-from-browser`, until a real need appears. `--config` doesn't move `playlists.toml`, which stays in the default folder.
 - **One source of settings:** `fetch`, `sync`, `tag` and `cover` all find a saved playlist by its ID, so a saved album, genre or cover applies whichever command runs.
 - **Added:** `sync --dry-run`, because a first sync of a long playlist can mean many gigabytes.
+
+## 29. 2026-11-04 — v0.1.0 documentation and release
+- **Decision:** the CLI reference is generated from Typer, and a test fails if it's stale. Tests also check that the config and exit-code pages list every setting and code. The spikes are removed, because decisions 18 to 21 keep their results and git history keeps the code. Fixtures use invented text, and the plan's byline is gone.
+- **Why:** the repository is public, so third-party text shouldn't stay in current files. The earlier versions remain in history, because removing them would mean rewriting public commits.
+- **Also:** the README states that the tool is for personal use and that YouTube's terms restrict downloading. That's a plain statement of the risk in decision 14, not legal advice.

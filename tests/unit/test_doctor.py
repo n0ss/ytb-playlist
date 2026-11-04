@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -75,4 +76,4 @@ def test_doctor_creates_nothing(install_tools, home: Path) -> None:
 def test_version_option_prints_the_version() -> None:
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0.dev0" in result.output
+    assert result.output.strip() == version("ytb-playlist")
