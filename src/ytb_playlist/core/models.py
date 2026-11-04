@@ -11,6 +11,11 @@ class MediaFormat(StrEnum):
     MP4 = "mp4"
 
 
+class CoverSource(StrEnum):
+    EPISODE = "episode"
+    PLAYLIST = "playlist"
+
+
 class FailureKind(StrEnum):
     PERMANENT = "permanent"
     TEMPORARY = "temporary"
