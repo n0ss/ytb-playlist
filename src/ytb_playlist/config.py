@@ -38,7 +38,7 @@ def load_config(path: Path | None = None) -> Config:
             data = tomllib.load(file)
     except OSError as error:
         raise ConfigError(f"cannot read {path}: {error.strerror}") from error
-    except tomllib.TOMLDecodeError as error:
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         raise ConfigError(f"invalid TOML in {path}: {error}") from error
     return _parse(data, path)
 
@@ -47,10 +47,10 @@ def _parse(data: dict, path: Path) -> Config:
     root = data.get("output_root", "~/Music/YouTube")
     if not isinstance(root, str):
         raise ConfigError(f"{path}: output_root must be a string")
-    return Config(
-        output_root=Path(root).expanduser(),
-        binaries=_parse_binaries(data.get("binaries", {}), path),
-    )
+    output_root = Path(root).expanduser()
+    if not output_root.is_absolute():
+        raise ConfigError(f"{path}: output_root must be an absolute path")
+    return Config(output_root, _parse_binaries(data.get("binaries", {}), path))
 
 
 def _parse_binaries(table: object, path: Path) -> dict[str, Path]:

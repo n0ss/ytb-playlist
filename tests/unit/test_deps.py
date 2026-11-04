@@ -57,6 +57,13 @@ def test_version_of_unexpected_output_is_none(bin_dir: Path) -> None:
     assert deps.read_version("ffmpeg", stub) is None
 
 
+def test_version_of_undecodable_output_is_none(bin_dir: Path) -> None:
+    stub = bin_dir / "deno"
+    stub.write_text("#!/bin/sh\nprintf '\\377\\376'\n")
+    stub.chmod(0o755)
+    assert deps.read_version("deno", stub) is None
+
+
 @pytest.mark.parametrize(
     ("version", "expected"),
     [
@@ -92,7 +99,7 @@ def test_read_only_parent_is_not_writable(tmp_path: Path) -> None:
 def test_check_reports_each_tool(tmp_path: Path, install_tools) -> None:
     install_tools()
     report = deps.check(config(tmp_path), tmp_path, today=date(2026, 11, 4))
-    assert {d.name: d.version for d in report.dependencies} == {
+    assert {name: d.version for name, d in report.dependencies.items()} == {
         "yt-dlp": "2026.10.26",
         "ffmpeg": "9.0.2",
         "deno": "2.9.8",
@@ -139,6 +146,14 @@ def test_check_is_silent_when_the_last_passed_version_matches(
     (tmp_path / deps.LAST_PASS_FILE).write_text("2026.10.26\n")
     report = deps.check(config(tmp_path), tmp_path, today=date(2026, 11, 4))
     assert not any("network test" in notice for notice in report.notices)
+
+
+def test_check_survives_an_unreadable_last_pass_file(tmp_path: Path, install_tools) -> None:
+    install_tools()
+    (tmp_path / deps.LAST_PASS_FILE).write_bytes(b"\xff\xfe")
+    report = deps.check(config(tmp_path), tmp_path, today=date(2026, 11, 4))
+    assert report.problems == []
+    assert any("unreadable" in notice for notice in report.notices)
 
 
 def test_check_reports_an_unwritable_output_root(tmp_path: Path, install_tools) -> None:

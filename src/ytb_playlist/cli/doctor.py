@@ -15,18 +15,18 @@ from ytb_playlist.config import ConfigError, default_config_dir, load_config
 
 def doctor(ctx: typer.Context) -> None:
     """Check yt-dlp, ffmpeg, deno and the output folder."""
-    console = Console()
     config_path: Path | None = ctx.obj
     try:
         config = load_config(config_path)
     except ConfigError as error:
-        console.print(Text(f"error: {error}", style="red"))
+        Console(stderr=True).print(Text(f"error: {error}", style="red"), soft_wrap=True)
         raise typer.Exit(exit_codes.USAGE_ERROR) from error
 
+    console = Console()
     report = deps.check(config, default_config_dir(), date.today())
 
     table = Table("Tool", "Version", "Path")
-    for dependency in report.dependencies:
+    for dependency in report.dependencies.values():
         table.add_row(
             dependency.name,
             Text(dependency.version or "-"),

@@ -13,11 +13,11 @@ from ytb_playlist.config import TOOLS, Config
 HOMEBREW_BIN = Path("/opt/homebrew/bin")
 LAST_PASS_FILE = "last-network-pass.txt"
 # The release that fixes the CVEs listed in decision 15.
-YTDLP_SECURITY_BASELINE = "2026.7.4"
+YTDLP_SECURITY_BASELINE = date(2026, 7, 4)
 
 VERSION_FLAGS = {"yt-dlp": "--version", "ffmpeg": "-version", "deno": "--version"}
 VERSION_PATTERNS = {
-    "yt-dlp": re.compile(r"\d{4}\.\d+\.\d+(?:\.\d+)?$"),
+    "yt-dlp": re.compile(r"(\d{4}\.\d+\.\d+(?:\.\d+)?)$"),
     "ffmpeg": re.compile(r"ffmpeg version (\S+)"),
     "deno": re.compile(r"deno (\S+)"),
 }
@@ -33,7 +33,7 @@ class Dependency:
 
 @dataclass(frozen=True)
 class Report:
-    dependencies: list[Dependency]
+    dependencies: dict[str, Dependency]
     problems: list[str]
     notices: list[str]
 
@@ -53,15 +53,14 @@ def read_version(name: str, binary: Path) -> str | None:
             check=True,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=VERSION_TIMEOUT_SECONDS,
         )
     except OSError, subprocess.SubprocessError:
         return None
     first_line = result.stdout.partition("\n")[0].strip()
     match = VERSION_PATTERNS[name].match(first_line)
-    if match is None:
-        return None
-    return match.group(1) if match.groups() else match.group(0)
+    return match.group(1) if match else None
 
 
 def ytdlp_release_date(version: str) -> date | None:
@@ -81,20 +80,19 @@ def can_write(folder: Path) -> bool:
 
 
 def check(config: Config, state_dir: Path, today: date) -> Report:
-    dependencies = []
+    dependencies = {}
     problems = []
     for name in TOOLS:
         binary = find_binary(name, config.binaries.get(name))
         version = read_version(name, binary) if binary else None
-        dependencies.append(Dependency(name, binary, version))
+        dependencies[name] = Dependency(name, binary, version)
         if binary is None:
             problems.append(f"{name} not found")
         elif version is None:
             problems.append(f"{name} at {binary} did not report a version")
     if not can_write(config.output_root):
         problems.append(f"{config.output_root} is not writable")
-    ytdlp = next(dependency for dependency in dependencies if dependency.name == "yt-dlp")
-    return Report(dependencies, problems, _ytdlp_notices(ytdlp, state_dir, today))
+    return Report(dependencies, problems, _ytdlp_notices(dependencies["yt-dlp"], state_dir, today))
 
 
 def _ytdlp_notices(ytdlp: Dependency, state_dir: Path, today: date) -> list[str]:
@@ -104,13 +102,21 @@ def _ytdlp_notices(ytdlp: Dependency, state_dir: Path, today: date) -> list[str]
     released = ytdlp_release_date(ytdlp.version)
     if released is not None:
         notices.append(f"yt-dlp is {(today - released).days} days old")
-        if released < ytdlp_release_date(YTDLP_SECURITY_BASELINE):
+        if released < YTDLP_SECURITY_BASELINE:
+            baseline = YTDLP_SECURITY_BASELINE
             notices.append(
-                f"yt-dlp is older than {YTDLP_SECURITY_BASELINE}: run brew upgrade yt-dlp"
+                f"yt-dlp is older than {baseline.year}.{baseline.month}.{baseline.day}: "
+                "run brew upgrade yt-dlp"
             )
     last_pass = state_dir / LAST_PASS_FILE
     if not last_pass.exists():
         notices.append("last yt-dlp version to pass the network test: not recorded yet")
-    elif (passed := last_pass.read_text().strip()) != ytdlp.version:
+        return notices
+    try:
+        passed = last_pass.read_text().strip()
+    except OSError, UnicodeDecodeError:
+        notices.append(f"{last_pass} is unreadable: run the network test again")
+        return notices
+    if passed != ytdlp.version:
         notices.append(f"the network test last passed on yt-dlp {passed}: run it again")
     return notices

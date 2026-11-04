@@ -41,6 +41,18 @@ def test_doctor_exits_2_on_an_invalid_config(install_tools, tmp_path: Path) -> N
     assert "invalid TOML" in result.output
 
 
+def test_config_error_goes_to_stderr_on_one_line(
+    install_tools, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_tools()
+    monkeypatch.setenv("COLUMNS", "40")
+    bad = tmp_path / "bad.toml"
+    bad.write_text("output_root = [")
+    result = runner.invoke(app, ["--config", str(bad), "doctor"])
+    assert result.stdout == ""
+    assert str(bad) in result.stderr
+
+
 def test_doctor_uses_the_binary_from_the_config(install_tools, bin_dir, tmp_path: Path) -> None:
     install_tools("deno")
     custom = tmp_path / "custom"

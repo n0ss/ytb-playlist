@@ -61,9 +61,17 @@ def test_binary_paths_are_read(tmp_path: Path) -> None:
         ("[binaries]\nyt-dlp = 'relative/path'\n", "absolute"),
         ("[binaries]\nyt-dlp = 3\n", "yt-dlp"),
         ("binaries = 'x'\n", "binaries"),
+        ("output_root = 'Music'\n", "absolute"),
     ],
 )
 def test_invalid_config_is_rejected(tmp_path: Path, text: str, message: str) -> None:
     path = write(tmp_path / "c.toml", text)
     with pytest.raises(ConfigError, match=message):
+        load_config(path)
+
+
+def test_undecodable_config_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "c.toml"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(ConfigError, match="invalid TOML"):
         load_config(path)
