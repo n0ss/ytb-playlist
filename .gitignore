@@ -18,8 +18,14 @@ htmlcov/
 *.mp3
 *.mp4
 *.m4a
+*.m4v
+*.mkv
+*.ogg
+*.opus
+*.webp
 *.webm
 *.part
+spikes/output/
 
 # macOS
 .DS_Store

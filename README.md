@@ -7,6 +7,8 @@
 CLAUDE.md             project instructions for Claude Code
 PRODUCT.md            what the tool is for and its constraints
 CHANGELOG.md
+pyproject.toml        uv project, dependencies, pytest and ruff settings
+src/ytb_playlist/     the package
 docs/
   plan.md             full plan and phases
   tech-decisions.md   every decision, with its reason

@@ -216,7 +216,7 @@ wheels = [
 
 [[package]]
 name = "ytb-playlist"
-version = "0.1.0"
+version = "0.1.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "mutagen" },
@@ -233,7 +233,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mutagen", specifier = ">=1.48.1" },
+    { name = "mutagen", specifier = ">=1.48.1,<1.49" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "typer", specifier = ">=0.27,<0.28" },
