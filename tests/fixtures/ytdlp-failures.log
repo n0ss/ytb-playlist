@@ -1,0 +1,6 @@
+ERROR: [youtube] aaaaaaaaaaa: This video is unavailable
+ERROR: [youtube] PiZNuhbUERY: Requested format is not available. Use --list-formats for a list of available formats
+WARNING: [youtube] PiZNuhbUERY: Unable to download webpage: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=9): Failed to establish a new connection"))
+ERROR: [youtube] PiZNuhbUERY: Unable to download API page: ('Unable to connect to proxy', NewConnectionError("HTTPSConnection(host='127.0.0.1', port=9): Failed to establish a new connection"))
+WARNING: [youtube:tab] YouTube said: ERROR - Request contains an invalid argument.
+ERROR: [youtube:tab] PLaaaaaaaaaaaaaaaaaaaa: Unable to download API page: HTTP Error 400: Bad Request (caused by <HTTPError 400: Bad Request>)

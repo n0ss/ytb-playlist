@@ -26,7 +26,11 @@ class Failure:
 class PlaylistInfo:
     id: str
     title: str
-    item_count: int
+    item_ids: tuple[str, ...]
+
+    @property
+    def item_count(self) -> int:
+        return len(self.item_ids)
 
 
 @dataclass(frozen=True)
