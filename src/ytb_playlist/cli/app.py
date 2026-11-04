@@ -10,11 +10,15 @@ import typer
 from ytb_playlist.cli.doctor import doctor
 from ytb_playlist.cli.fetch import fetch_command
 from ytb_playlist.cli.info import info
+from ytb_playlist.cli.library import cover_command, rename_command, tag_command
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_show_locals=False)
 app.command()(doctor)
 app.command()(info)
 app.command("fetch")(fetch_command)
+app.command("tag")(tag_command)
+app.command("cover")(cover_command)
+app.command("rename")(rename_command)
 
 
 def show_version(value: bool) -> None:

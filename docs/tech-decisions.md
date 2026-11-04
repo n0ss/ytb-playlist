@@ -142,3 +142,9 @@
 - **Decision:** host the project publicly on GitHub at `n0ss/ytb-playlist`, now rather than at v0.1.0. This replaces the GitLab plan in decision 4 and the "code exists only on this Mac" risk recorded there. Commits use the owner's chosen public address.
 - **Why:** owner's choice.
 - **Accepted risk:** publishing a downloader goes further than the private use in decision 14, whose terms risk still applies to how the tool is used. Commit history and `tests/fixtures/`, which holds a third-party title and description, are public too. Nothing downloaded is ever committed.
+
+## 27. 2026-11-04 — Tagging and file commands
+- **Decision:** `fetch` tags each file right after moving it into place, and later runs retry untagged items without downloading again. A missing or damaged thumbnail gives a warning and the tags are still written; a failed tag keeps the file and exits 1. Covers are `square` for MP3 and `wide` for MP4, and `tag` and `cover` accept `--cover` to change that.
+- **Dropped from the plan:** the `pad` cover mode, `tag --from-info-json` (tagging always uses the saved metadata), and `cover --refetch`. `cover = "playlist"` moves to phase 6 with per-playlist config.
+- **`rename`:** works only on files with ` [<id>]` in the name and saved metadata, because nothing else has the data to name them correctly. It never overwrites. Old names go to `.ytb-playlist/rename-log.jsonl`, written before the rename; there is no undo command.
+- **Verified:** `ytb-playlist` tagged a real full-length MP3 without downloading it again, and a clipped MP4 went through the whole engine (H.264 + AAC, 1280×720 cover, no media kind). This closes the MP4 limit in decision 24.

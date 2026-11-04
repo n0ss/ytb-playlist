@@ -55,8 +55,8 @@ ytb-playlist
 │   ├── add    URL --format mp3|mp4 [--name NAME]   # register in config
 │   ├── list
 │   └── remove NAME
-├── tag     PATH... [--from-info-json] [--cover square|wide]   # (re)tag existing files
-├── cover   PATH... [--refetch]                         # (re)extract and embed cover
+├── tag     PATH... [--cover square|wide]               # (re)tag existing files
+├── cover   PATH... [--cover square|wide]               # embed the saved thumbnail again
 ├── rename  PATH... [--dry-run]                         # apply naming convention to existing files
 └── config  show|path|edit
 
@@ -183,7 +183,7 @@ Let yt-dlp fetch the best thumbnail and convert it to JPEG, then crop and embed 
 1. **Fetch:** `--write-thumbnail --convert-thumbnails jpg` (YouTube often serves WebP, which ID3 APIC and MP4 covr don't reliably accept). yt-dlp picks the highest-preference thumbnail from the info dict, usually `maxresdefault` (1280×720 on the test playlist, whatever the metadata claims; see decision 18); fall back to `hqdefault` (480×360) when absent.
 2. **Store:** original kept in `.ytb-playlist/thumbs/<id>.jpg` so re-tagging never refetches.
 3. **Transform (Pillow, `cover.py`):**
-   - MP3, mode `square` (default): centre crop to the shorter side, capped at 1000×1000, never upscaling. Mode `pad`: 16:9 image letterboxed on a blurred square background, for thumbnails with text at the edges.
+   - MP3, mode `square` (default): centre crop to the shorter side, capped at 1000×1000, never upscaling.
    - MP4, mode `wide`: keep the source size.
    - Re-encode JPEG, strip EXIF, and step quality down from 90 to 75 until the image is under 500 KB. If it still doesn't fit, keep the quality-75 version and log a warning.
 4. **Embed:** in the mutagen pass (APIC type 3 / covr), not with `--embed-thumbnail`, so one code path handles both formats and retagging.

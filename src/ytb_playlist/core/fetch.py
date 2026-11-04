@@ -36,6 +36,7 @@ from ytb_playlist.core.models import (
 )
 from ytb_playlist.core.state import (
     STATE_DIR,
+    THUMBNAIL_DIR,
     PlaylistState,
     find_folder,
     load_state,
@@ -48,7 +49,6 @@ from ytb_playlist.urls import playlist_url
 
 ARCHIVE_FILE = "archive.txt"
 WORK_DIR = "tmp"
-THUMBNAIL_DIR = "thumbs"
 ITEM_RANGE = re.compile(r"(\d+)(?::(\d+))?")
 
 

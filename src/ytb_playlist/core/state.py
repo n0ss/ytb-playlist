@@ -14,6 +14,7 @@ from ytb_playlist.core.models import Failure, FailureKind, MediaFormat
 
 STATE_DIR = ".ytb-playlist"
 STATE_FILE = "state.json"
+THUMBNAIL_DIR = "thumbs"
 STATE_VERSION = 1
 
 
