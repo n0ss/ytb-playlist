@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The `info` command: a quick look at a playlist, with nothing downloaded."""
 
 from typing import Annotated

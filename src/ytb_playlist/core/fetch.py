@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The fetch engine: download into a work folder, then move each item to its final name.
 
 Front ends call `fetch` and render the events; nothing here prints.

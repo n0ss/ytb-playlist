@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The Typer application."""
 
 from importlib.metadata import version as package_version

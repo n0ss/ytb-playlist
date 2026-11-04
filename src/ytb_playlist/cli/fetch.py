@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The `fetch` command: run the engine and render its events with Rich."""
 
 from datetime import date

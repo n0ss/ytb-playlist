@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Opt-in: `uv run pytest -m network -q`. Downloads 3 items of the test playlist, clipped."""
 
 from datetime import date

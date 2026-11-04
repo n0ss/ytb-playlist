@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """What every command needs: errors, the config and the backend."""
 
 import typer

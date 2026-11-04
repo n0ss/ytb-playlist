@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Turn a pasted YouTube URL into its one canonical playlist URL."""
 
 from urllib.parse import parse_qs, urlsplit

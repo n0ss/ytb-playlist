@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Per-playlist state: folder lookup and `.ytb-playlist/state.json`.
 
 `archive.txt` belongs to yt-dlp and owns "downloaded". This file owns "tagged" and failures.

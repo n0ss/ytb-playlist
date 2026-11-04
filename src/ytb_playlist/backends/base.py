@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The test seam between the engine and yt-dlp."""
 
 from collections.abc import Generator

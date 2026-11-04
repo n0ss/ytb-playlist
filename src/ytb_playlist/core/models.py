@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Data shared by the engine and its front ends. GUI-agnostic."""
 
 from dataclasses import dataclass

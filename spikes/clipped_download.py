@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Spike: does --download-sections give a usable clip, and does the archive stop a rerun?"""
 
 import json

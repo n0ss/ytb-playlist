@@ -132,3 +132,8 @@
 - **Progress:** it restarts per stream, as recorded on a real two-stream download, and a line that has reached its estimate is ignored until `finished`. This closes the "not tested" list in decision 20.
 - **Clipping:** `clip_seconds` exists in the core only, because a clip is archived as if complete. The network test uses a throwaway folder.
 - **Limit:** a later run reports the number of skipped permanent failures, not each one; the reasons are in `state.json`. The network test covers MP3 only, and the MP4 path was checked by spike 19.
+
+## 25. 2026-11-04 — Licence
+- **Decision:** GNU General Public License v3.0 only (`GPL-3.0-only`), with the full text in `LICENSE`, the expression in `pyproject.toml`, and an SPDX identifier in each Python file.
+- **Why:** owner's choice. It also fits the dependencies: mutagen is GPL-licensed, and the permissive licences of Typer, Rich and Pillow are compatible. yt-dlp, ffmpeg and deno run as separate programs.
+- **Limit:** the licence covers this project's own work. It doesn't cover the third-party metadata in `tests/fixtures/`.

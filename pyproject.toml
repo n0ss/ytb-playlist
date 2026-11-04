@@ -3,6 +3,8 @@ name = "ytb-playlist"
 version = "0.1.0.dev0"
 description = "Download YouTube playlists as MP3 or MP4, named by date and tagged for Apple Music"
 requires-python = ">=3.14"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 dependencies = [
     "mutagen>=1.48.1,<1.49",
     "pillow>=13.0.0",

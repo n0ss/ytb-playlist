@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Spike: build the Music.app test files in a dedicated export folder."""
 
 import io

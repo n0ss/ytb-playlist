@@ -7,6 +7,7 @@
 CLAUDE.md             project instructions for Claude Code
 PRODUCT.md            what the tool is for and its constraints
 CHANGELOG.md
+LICENSE               GNU GPL v3.0
 pyproject.toml        uv project, dependencies, pytest and ruff settings
 src/ytb_playlist/     the package
 spikes/               throwaway experiments behind decisions 18 to 21
@@ -55,3 +56,6 @@ See `docs/test-procedure.md`.
 ## Claude Code setup
 - Base set (user scope): superpowers, task-observer, hookify, security-guidance, claude-md-management, context7, project-bootstrap, thermo-nuclear-code-quality-review
 - Project plugins and skills: none
+
+## License
+GNU General Public License v3.0 only. See `LICENSE`. Source files carry an SPDX identifier.

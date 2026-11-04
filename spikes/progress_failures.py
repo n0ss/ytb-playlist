@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Spike: what do --progress-template and exit codes give us, including when things fail?"""
 
 import subprocess

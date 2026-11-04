@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Exit codes, as listed in docs/plan.md."""
 
 PARTIAL = 1

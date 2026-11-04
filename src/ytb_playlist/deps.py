@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Find the system tools, read their versions and report on them for `doctor`."""
 
 import os

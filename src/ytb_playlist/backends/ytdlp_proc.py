@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Run the Homebrew yt-dlp as a subprocess and parse its output.
 
 Arguments are always lists, and no metadata reaches a shell or `--exec`. Our templates print only

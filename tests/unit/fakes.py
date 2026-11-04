@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """A stand-in for yt-dlp, shared by the engine and CLI tests."""
 
 import json

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Build file and folder names. Titles, dates and IDs come from untrusted metadata."""
 
 import re

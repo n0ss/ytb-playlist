@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Load the TOML config: output root and binary paths."""
 
 import os

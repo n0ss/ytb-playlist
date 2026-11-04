@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Shared helpers for the throwaway phase 1a spikes."""
 
 import subprocess

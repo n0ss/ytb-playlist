@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """The `doctor` command: render the dependency report with Rich."""
 
 from datetime import date

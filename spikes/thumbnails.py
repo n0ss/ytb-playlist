@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Spike: which thumbnails does YouTube offer, and what does yt-dlp save as JPEG?"""
 
 import json
