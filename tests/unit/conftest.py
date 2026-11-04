@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 from collections.abc import Callable
+import os
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,14 @@ VERSION_OUTPUT = {
     "ffmpeg": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
     "deno": "deno 2.9.8 (stable, release, aarch64-apple-darwin)",
 }
+
+
+@pytest.fixture(autouse=True)
+def clean_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must not depend on settings exported in the developer's shell."""
+    for name in os.environ:
+        if name.startswith("YTB_PLAYLIST_"):
+            monkeypatch.delenv(name)
 
 
 def write_stub(directory: Path, name: str, output: str, status: int = 0) -> Path:

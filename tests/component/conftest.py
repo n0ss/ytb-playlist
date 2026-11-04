@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Real media, generated at test time because media files are never committed."""
 
+import os
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -8,6 +9,14 @@ from pathlib import Path
 
 import pytest
 from PIL import Image
+
+
+@pytest.fixture(autouse=True)
+def clean_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must not depend on settings exported in the developer's shell."""
+    for name in os.environ:
+        if name.startswith("YTB_PLAYLIST_"):
+            monkeypatch.delenv(name)
 
 
 def generate(path: Path, *codec: str) -> Path:
