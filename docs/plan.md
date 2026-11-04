@@ -1,6 +1,6 @@
 # ytb-playlist — Plan
 
-Nov 4, 2026 · @Yohan
+Nov 4, 2026
 
 ## Summary and key decisions
 

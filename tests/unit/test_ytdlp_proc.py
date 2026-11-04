@@ -130,7 +130,7 @@ def test_recorded_two_stream_download_parses() -> None:
 def test_recorded_playlist_listing_parses() -> None:
     info = parse_playlist((FIXTURES / "ytdlp-flat-playlist.json").read_text())
     assert info.id == "PL9wDNu3ZrVQ63LOO81qh8-Ycq6-vIEqcg"
-    assert info.title == 'Les intégrales de "La dernière"'
+    assert info.title == 'Les essais de "L\'été"'
     assert info.item_ids[:3] == ("PiZNuhbUERY", "LYCiEm4JEkU", "4oEFyaR6uiM")
     assert info.item_count == 5
 

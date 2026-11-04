@@ -23,14 +23,14 @@ def info(**fields: object) -> dict[str, object]:
     } | fields
 
 
-def test_real_item_maps_to_the_planned_tags() -> None:
+def test_recorded_item_maps_to_the_planned_tags() -> None:
     item = json.loads((FIXTURES / "PiZNuhbUERY.info.json").read_text())
     tags = map_tags(item)
     assert tags == TrackTags(
-        title="2024-10-23 - La dernière, l'intégrale du 20 octobre",
-        artist="Radio Nova",
-        album='Les intégrales de "La dernière"',
-        album_artist="Radio Nova",
+        title="2024-10-23 - L'été dernier, l'essai du 20 octobre",
+        artist="Radio Exemple",
+        album='Les essais de "L\'été"',
+        album_artist="Radio Exemple",
         track=1,
         date="2024-10-23",
         genre="YouTube",
