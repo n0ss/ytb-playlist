@@ -207,7 +207,7 @@ Eight small phases (0–7, with phase 1 in two parts), each ending with a test t
 | 0 | Bootstrap | Project files from `/project-bootstrap`, uv project, `src/` layout, ruff, pytest, local `git init` on your go-ahead. Open checks done: decisions 15 and 16 | `uv run pytest` green on an empty test; `ruff check` clean |
 | 1a | Tool spikes (Claude) | `spikes/` scripts: thumbnail sizes; clipped download with `--download-sections`; progress parsing and failure handling from `--progress-template` and exit codes | One entry per spike in `docs/tech-decisions.md` |
 | 1b | Music.app spikes (you and Claude) | v2.3 vs v2.4; whether Music.app re-reads changed tags after import; how it displays the date; avc1 MP4 import; episode vs playlist cover | One entry per spike in `docs/tech-decisions.md` |
-| 2 | Deps + config + `doctor` | Minimal `config.py` (load, binary paths), binary discovery, version checks, `doctor` command | Unit tests with faked PATH; config load tests; `doctor` exit 3 when yt-dlp or deno missing; notice when yt-dlp differs from the last version the network test passed |
+| 2 | Deps + config + `doctor` | Minimal `config.py` (load, binary paths), binary discovery, version checks, `doctor` command | Unit tests with faked PATH; config load tests; `doctor` exit 3 when yt-dlp, ffmpeg or deno missing; notice when yt-dlp differs from the last version the network test passed |
 | 3 | Naming + URLs | `naming.py`, `urls.py` | Table-driven tests: dates/fallbacks, Unicode, 255-byte limit, forbidden chars including leading quotes, `/show/VL…` URLs; sorted list == date order |
 | 4 | Fetch engine | `info`, `fetch` (mp3/mp4), archive, `state.json`, folder lookup by ID, temp-folder download moved to its final name, events | Offline: fake backend replays recorded yt-dlp output and emits expected events; a renamed playlist reuses its folder; two matching folders stop with an error; a format change is refused; permanent failures are skipped on later runs; an interrupted download leaves nothing in the playlist folder. Network: 3 clipped items download, rerun downloads 0 |
 | 5 | Tagging + cover + existing files | mapping, id3, mp4, cover; `tag`, `cover`, `rename` commands | Round-trip tag tests; image size tests; `rename --dry-run` tests; an untagged download is retried |
@@ -269,7 +269,7 @@ Plan with tests:
 0 Bootstrap: uv project, ruff, pytest, git init on go-ahead; check CVE IDs, how ytb-playlist gets on PATH → empty test green.
 1a Tool spikes: thumbnails, clipped download, progress and failure parsing → entries in docs/tech-decisions.md.
 1b Music.app spikes: ID3 v2.3 vs v2.4, tag re-reading, date display, avc1 MP4 import, episode vs playlist cover → entries in docs/tech-decisions.md.
-2 minimal config + deps + doctor → faked-PATH unit tests, config load tests, exit 3 without yt-dlp or deno.
+2 minimal config + deps + doctor → faked-PATH unit tests, config load tests, exit 3 without yt-dlp, ffmpeg or deno.
 3 naming + URL normalisation → table-driven tests incl. Unicode, 255-byte limit, /show/VL URLs.
 4 info/fetch engine + archive + state.json + lookup by ID + temp-folder download + events → fake-backend tests; opt-in network test on 3 clipped items (rerun downloads 0).
 5 tagging + cover + tag/cover/rename commands → round-trip tests, image tests, untagged retry.

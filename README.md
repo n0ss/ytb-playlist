@@ -25,7 +25,10 @@ brew install yt-dlp deno ffmpeg uv   # whatever is missing
 ```
 
 ## Usage
-TBD: commands arrive with phases 2 to 6. The planned interface is in `docs/plan.md`.
+```bash
+uv run ytb-playlist doctor   # check yt-dlp, ffmpeg, deno and the output folder
+```
+More commands arrive with phases 4 to 6. The planned interface is in `docs/plan.md`.
 
 ## Tests
 ```bash
