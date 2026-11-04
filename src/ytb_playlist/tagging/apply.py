@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Tag one media file from its metadata and thumbnail."""
 
+import os
+import shutil
+import subprocess
 from collections.abc import Callable, Mapping
 from enum import StrEnum
 from pathlib import Path
@@ -29,6 +32,32 @@ COVER_WRITERS = {".mp3": replace_id3_cover, ".mp4": replace_mp4_cover}
 DEFAULT_MODES = {".mp3": CoverMode.SQUARE, ".mp4": CoverMode.WIDE}
 BUILDERS = {CoverMode.SQUARE: square_cover, CoverMode.WIDE: wide_cover}
 TAG_ERRORS = (MutagenError, OSError, ValueError)
+
+
+def _clone(source: Path, target: Path) -> None:
+    """An APFS clone is instant and takes no space; any other disk gets a plain copy."""
+    try:
+        subprocess.run(
+            ["/bin/cp", "-c", str(source.absolute()), str(target.absolute())],
+            check=True,
+            capture_output=True,
+        )
+    except OSError, subprocess.SubprocessError:
+        shutil.copy2(source, target)
+
+
+def _write_safely(path: Path, write: Callable[[Path], None]) -> None:
+    """Mutagen shifts audio data in place, so an interrupted write could damage the file.
+
+    Tag a copy beside it instead, then swap it in with an atomic rename.
+    """
+    temp = path.with_name(f".{path.name}.tagging")
+    try:
+        _clone(path, temp)
+        write(temp)
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def _require_supported(path: Path) -> None:
@@ -61,8 +90,10 @@ def tag_file(
             data = cover.data
             if cover.over_budget:
                 warnings.append(f"cover of {path.name} is over the size budget")
+    tags = map_tags(info)
+    write = WRITERS[path.suffix]
     try:
-        WRITERS[path.suffix](path, map_tags(info), data)
+        _write_safely(path, lambda temp: write(temp, tags, data))
     except TAG_ERRORS as error:
         raise TaggingError(f"{path.name}: {error}") from error
     return tuple(warnings)
@@ -71,7 +102,9 @@ def tag_file(
 def replace_cover(path: Path, thumbnail: Path, mode: CoverMode | None = None) -> None:
     """Change only the cover, keeping every other tag."""
     _require_supported(path)
+    write = COVER_WRITERS[path.suffix]
     try:
-        COVER_WRITERS[path.suffix](path, _build(path, thumbnail, mode).data)
+        data = _build(path, thumbnail, mode).data
+        _write_safely(path, lambda temp: write(temp, data))
     except (CoverError, *TAG_ERRORS) as error:
         raise TaggingError(f"{path.name}: {error}") from error

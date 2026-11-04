@@ -16,6 +16,7 @@ from ytb_playlist.core.state import (
     StateError,
     find_folder,
     load_state,
+    read_item_info,
     save_state,
 )
 
@@ -172,3 +173,17 @@ assert load_state(Path({str(tmp_path)!r})) == state
     subprocess.run([sys.executable, "-c", script], env=env, check=True)
     saved = (tmp_path / ".ytb-playlist" / "state.json").read_bytes()
     assert "\u00e9t\u00e9" in saved.decode("utf-8")
+
+
+def test_item_info_is_read_for_its_own_item(tmp_path: Path) -> None:
+    path = tmp_path / "a.info.json"
+    path.write_text('{"id": "a", "title": "\u00e9t\u00e9"}')
+    assert read_item_info(path, "a")["title"] == "\u00e9t\u00e9"
+
+
+@pytest.mark.parametrize("content", ["{broken", "[]", '{"id": "other"}', "{}"])
+def test_unusable_item_info_is_refused(tmp_path: Path, content: str) -> None:
+    path = tmp_path / "a.info.json"
+    path.write_text(content)
+    with pytest.raises(ValueError):
+        read_item_info(path, "a")

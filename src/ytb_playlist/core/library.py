@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from ytb_playlist.core.state import STATE_DIR, THUMBNAIL_DIR, load_state, save_state
+from ytb_playlist.core.state import (
+    STATE_DIR,
+    THUMBNAIL_DIR,
+    load_state,
+    read_item_info,
+    save_state,
+)
 from ytb_playlist.cover import find_thumbnail
 from ytb_playlist.naming import file_name
 
@@ -54,14 +60,11 @@ def load_item(path: Path) -> LocalItem:
     video_id = match[1]
     info_path = path.parent / STATE_DIR / f"{video_id}.info.json"
     try:
-        info = json.loads(info_path.read_text(encoding="utf-8"))
+        return LocalItem(path, video_id, read_item_info(info_path, video_id))
     except FileNotFoundError as error:
         raise LibraryError(f"{path.name}: no saved metadata") from error
     except (OSError, ValueError) as error:
-        raise LibraryError(f"{path.name}: unreadable metadata: {error}") from error
-    if not isinstance(info, dict) or info.get("id") != video_id:
-        raise LibraryError(f"{path.name}: the saved metadata is for another item")
-    return LocalItem(path, video_id, info)
+        raise LibraryError(f"{path.name}: unusable metadata: {error}") from error
 
 
 def mark_tagged(item: LocalItem) -> None:

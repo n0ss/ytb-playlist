@@ -65,6 +65,14 @@ def find_folder(output_root: Path, playlist_id: str) -> Path | None:
     return matches[0] if matches else None
 
 
+def read_item_info(path: Path, video_id: str) -> dict:
+    """Read saved metadata, which is untrusted, and check that it's for this item."""
+    info = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(info, dict) or info.get("id") != video_id:
+        raise ValueError(f"metadata doesn't match the item: {path.name}")
+    return info
+
+
 def load_state(folder: Path) -> PlaylistState | None:
     path = folder / STATE_DIR / STATE_FILE
     if not path.exists():

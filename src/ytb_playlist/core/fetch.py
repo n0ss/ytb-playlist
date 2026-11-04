@@ -4,7 +4,6 @@
 Front ends call `fetch` and render the events; nothing here prints.
 """
 
-import json
 import os
 import re
 from collections.abc import Callable
@@ -40,6 +39,7 @@ from ytb_playlist.core.state import (
     PlaylistState,
     find_folder,
     load_state,
+    read_item_info,
     save_state,
 )
 from ytb_playlist.cover import THUMBNAIL_SUFFIXES, find_thumbnail
@@ -143,7 +143,7 @@ class _Run:
             if not info_path.exists():
                 continue
             try:
-                info = self._read_info(info_path, video_id)
+                info = read_item_info(info_path, video_id)
             except (OSError, ValueError) as error:
                 self._fail(video_id, FailureKind.TEMPORARY, f"could not tag the item: {error}")
                 continue
@@ -206,17 +206,11 @@ class _Run:
         save_state(self.folder, self.state)
         self.on_event(ItemTagged(video_id, warnings))
 
-    def _read_info(self, path: Path, video_id: str) -> dict:
-        info = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(info, dict) or info.get("id") != video_id:
-            raise ValueError(f"metadata doesn't match the item: {path}")
-        return info
-
     def _move_into_place(self, video_id: str, media: Path) -> tuple[Path, dict]:
         if not is_safe_id(video_id) or media.parent.resolve() != self.work.resolve():
             raise ValueError(f"unexpected file: {media}")
         info_path = self.work / f"{video_id}.info.json"
-        info = self._read_info(info_path, video_id)
+        info = read_item_info(info_path, video_id)
         target = self.folder / file_name(info, media.suffix.removeprefix("."))
         if target.exists():
             media.unlink()

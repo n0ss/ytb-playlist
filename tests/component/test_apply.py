@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 import io
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from mutagen.mp4 import MP4
 from PIL import Image
 
 from ytb_playlist import cover
+from ytb_playlist.tagging import apply
 from ytb_playlist.tagging.apply import CoverMode, TaggingError, replace_cover, tag_file
 
 INFO = {"id": "abc", "title": "Title", "upload_date": "20241023", "channel": "Radio Nova"}
@@ -123,3 +125,70 @@ def test_replace_cover_needs_a_usable_thumbnail(
     bad.write_bytes(b"nope")
     with pytest.raises(TaggingError):
         replace_cover(media_file("mp3"), bad)
+
+
+def partial_write(path: Path, *_: object) -> None:
+    with path.open("r+b") as file:
+        file.write(b"half written")
+    raise KeyboardInterrupt
+
+
+@pytest.mark.parametrize("kind", ["mp3", "mp4"])
+def test_interrupted_tagging_leaves_the_original_intact(
+    media_file: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    path = media_file(kind)
+    before = path.read_bytes()
+    monkeypatch.setitem(apply.WRITERS, path.suffix, partial_write)
+    with pytest.raises(KeyboardInterrupt):
+        tag_file(path, INFO, None)
+    assert path.read_bytes() == before
+    assert [p.name for p in path.parent.iterdir() if p.name.startswith(".")] == []
+
+
+def test_failed_tagging_leaves_the_original_intact(
+    media_file: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = media_file("mp3")
+    before = path.read_bytes()
+
+    def fail(target: Path, *_: object) -> None:
+        target.write_bytes(b"damaged")
+        raise OSError("disk full")
+
+    monkeypatch.setitem(apply.WRITERS, ".mp3", fail)
+    with pytest.raises(TaggingError):
+        tag_file(path, INFO, None)
+    assert path.read_bytes() == before
+
+
+def test_interrupted_cover_change_leaves_the_original_intact(
+    media_file: Callable[[str], Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = media_file("mp3")
+    before = path.read_bytes()
+    monkeypatch.setitem(apply.COVER_WRITERS, ".mp3", partial_write)
+    with pytest.raises(KeyboardInterrupt):
+        replace_cover(path, thumbnail(tmp_path))
+    assert path.read_bytes() == before
+
+
+def test_tagging_works_without_clone_support(
+    media_file: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def no_clone(*_: object, **__: object) -> None:
+        raise subprocess.CalledProcessError(1, "cp")
+
+    monkeypatch.setattr(apply.subprocess, "run", no_clone)
+    path = media_file("mp3")
+    tag_file(path, INFO, None)
+    assert str(ID3(path)["TPE1"]) == "Radio Nova"
+
+
+def test_relative_name_starting_with_a_dash_is_safe(
+    media_file: Callable[[str], Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = media_file("mp3").rename(tmp_path / "- odd name.mp3")
+    monkeypatch.chdir(tmp_path)
+    tag_file(Path(path.name), INFO, None)
+    assert str(ID3(path)["TPE1"]) == "Radio Nova"
