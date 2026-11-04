@@ -106,3 +106,9 @@
 - **Interrupts:** `SIGTERM` exits -15 and leaves `.part`, `.part-Frag6` and `.ytdl` files, which supports the temp-folder download.
 - **Not tested:** two-stream MP4 progress, which should restart per stream, and resuming from `.part` files. Phase 4 covers both. The error strings belong to yt-dlp and can change, so `tests/fixtures/` will record them.
 - **Also found:** YouTube warns that 2 unavailable videos are hidden on the test playlist, so a listing can silently omit items.
+
+## 21. 2026-11-04 — Spike: Music.app import
+- **Decision:** keep ID3v2.3 with TYER + TDAT as planned. Write no MP4 media kind (`stik`). Keep the date in the title, as in `docs/plan.md`. Keep `cover = "episode"` as the default, with `"playlist"` as a usable option.
+- **Why:** imported by the owner in Music.app. v2.3 and v2.4 files looked identical in Get Info, so v2.3 stays the wider-compatibility choice. Music.app shows only the year, so the full date survives only in the title and filename. The H.264 + AAC MP4s imported and landed in Music Videos, in the same album as the MP3s, so `stik` buys nothing. The 188×188 playlist cover was judged acceptable.
+- **Not tested:** whether Music.app re-reads tags changed after import. The owner imports files and manages the library, so behaviour after import is out of scope. The test files were one 60-second clip of one episode.
+- **Consequence:** the planned import how-to and the phase 5 Music.app checklist are removed, so phase 5 ends at the automated tag round-trip tests, and the docs hold one how-to rather than the two in decision 5.

@@ -91,7 +91,7 @@ src/ytb_playlist/
 
 ## CLI documentation structure
 
-Single source of truth is the Typer code: help text lives in docstrings and option `help=`, and the CLI reference is generated, never hand-written. Other docs stay small for v0.1.0: reference pages for contracts the code must honour and two how-tos. Add pages when a real need appears.
+Single source of truth is the Typer code: help text lives in docstrings and option `help=`, and the CLI reference is generated, never hand-written. Other docs stay small for v0.1.0: reference pages for contracts the code must honour and one how-to. Add pages when a real need appears.
 
 ```text
 README.md                 # what it is, prerequisites, install, 3 example commands
@@ -101,7 +101,6 @@ docs/
   tech-decisions.md       # every decision, including spike results
   test-procedure.md
   how-to/
-    import-into-apple-music.md
     troubleshoot-youtube-errors.md   # deno, bot checks, update yt-dlp
   reference/
     cli.md                # GENERATED from Typer
@@ -161,7 +160,6 @@ yt-dlp downloads and converts; a separate mutagen pass writes the final tags fro
 | Source URL | `webpage_url` | WOAS | ----:com.apple.iTunes:URL (freeform) |
 | Video ID | `id` | TXXX:YOUTUBE\_ID | ----:…:YOUTUBE\_ID |
 | Cover | see next section | APIC type 3 (front), JPEG | covr (JPEG) |
-| Media kind | — | — | stik (music video = 6; to verify) |
 
 Steps:
 
@@ -169,7 +167,6 @@ Steps:
 2. Write `tagging/mapping.py` as pure functions (info dict → neutral `TrackTags` model) — 100 % unit-testable.
 3. `tagging/id3.py` and `tagging/mp4.py` serialise `TrackTags` with mutagen; strip ffmpeg-written tags first so only yours remain.
 4. Round-trip tests: write → read back with mutagen → compare model.
-5. Import test checklist in `docs/how-to/import-into-apple-music.md` (manual; Music.app is not scriptable enough to automate reliably).
 
 MP4 compatibility: Music/TV apps import H.264 + AAC in MP4 reliably. YouTube's best streams are often VP9/AV1 + Opus, so the default format selector accepts only `avc1` + `m4a`, capped at 1080p or a lower per-playlist `max_height` (720p is about 72 % smaller on the test playlist's first episode). YouTube serves no H.265 on the sampled items, so there is no re-encoding, and MP4 stays the container because Music and TV don't import MKV. If no compatible stream exists, the item fails with a clear report rather than silently producing a file the Apple apps refuse. `--quality max` is the opt-in that adds `bv*+ba` and lifts the cap:
 
@@ -213,7 +210,7 @@ Eight small phases (0–7, with phase 1 in two parts), each ending with a test t
 | 2 | Deps + config + `doctor` | Minimal `config.py` (load, binary paths), binary discovery, version checks, `doctor` command | Unit tests with faked PATH; config load tests; `doctor` exit 3 when yt-dlp or deno missing; notice when yt-dlp differs from the last version the network test passed |
 | 3 | Naming + URLs | `naming.py`, `urls.py` | Table-driven tests: dates/fallbacks, Unicode, 255-byte limit, forbidden chars including leading quotes, `/show/VL…` URLs; sorted list == date order |
 | 4 | Fetch engine | `info`, `fetch` (mp3/mp4), archive, `state.json`, folder lookup by ID, temp-folder download moved to its final name, events | Offline: fake backend replays recorded yt-dlp output and emits expected events; a renamed playlist reuses its folder; two matching folders stop with an error; a format change is refused; permanent failures are skipped on later runs; an interrupted download leaves nothing in the playlist folder. Network: 3 clipped items download, rerun downloads 0 |
-| 5 | Tagging + cover + existing files | mapping, id3, mp4, cover; `tag`, `cover`, `rename` commands | Round-trip tag tests; image size tests; `rename --dry-run` tests; an untagged download is retried; manual Music.app import checklist signed off |
+| 5 | Tagging + cover + existing files | mapping, id3, mp4, cover; `tag`, `cover`, `rename` commands | Round-trip tag tests; image size tests; `rename --dry-run` tests; an untagged download is retried |
 | 6 | Sync + full config | `playlist add/list/remove`, `sync --all`, full TOML config | Config merge precedence tests; sync adds only new items; `--retry-failed` retries permanent failures |
 | 7 | Docs + polish | Generated CLI reference, how-tos, CHANGELOG 0.1.0 | Docs-staleness test green; README commands copy-paste-run |
 
@@ -275,7 +272,7 @@ Plan with tests:
 2 minimal config + deps + doctor → faked-PATH unit tests, config load tests, exit 3 without yt-dlp or deno.
 3 naming + URL normalisation → table-driven tests incl. Unicode, 255-byte limit, /show/VL URLs.
 4 info/fetch engine + archive + state.json + lookup by ID + temp-folder download + events → fake-backend tests; opt-in network test on 3 clipped items (rerun downloads 0).
-5 tagging + cover + tag/cover/rename commands → round-trip tests, image tests, untagged retry, manual Music.app checklist.
+5 tagging + cover + tag/cover/rename commands → round-trip tests, image tests, untagged retry.
 6 playlist add/list/remove + sync + TOML config → precedence tests, --retry-failed.
 7 docs generated from Typer + staleness test; CHANGELOG 0.1.0.
 ```
