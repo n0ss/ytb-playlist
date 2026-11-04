@@ -47,6 +47,12 @@ class FetchOptions:
     dry_run: bool = False
     # Core only, never a CLI flag: a clipped item is archived as if complete.
     clip_seconds: int | None = None
+    retry_failed: bool = False
+    cover: CoverSource = CoverSource.EPISODE
+    max_height: int = 1080
+    quality_max: bool = False
+    sleep_min: int = 3
+    sleep_max: int = 8
 
 
 @dataclass(frozen=True)

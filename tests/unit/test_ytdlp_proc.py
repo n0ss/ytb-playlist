@@ -232,3 +232,33 @@ def test_playlist_info_reports_yt_dlp_s_error(tmp_path: Path) -> None:
     backend = backend_with(tmp_path, "echo 'ERROR: [youtube:tab] PLa: HTTP Error 400' >&2; exit 1")
     with pytest.raises(BackendError, match="HTTP Error 400"):
         backend.playlist_info(PLAYLIST_URL)
+
+
+def test_height_cap_is_applied_to_every_format_choice() -> None:
+    selector = download_args(request(format=MediaFormat.MP4, max_height=720))
+    selector = selector[selector.index("-f") + 1]
+    assert selector.count("height<=720") == 2
+    assert "1080" not in selector
+
+
+def test_quality_max_lifts_the_cap_and_allows_any_stream() -> None:
+    args = download_args(request(format=MediaFormat.MP4, quality_max=True))
+    selector = args[args.index("-f") + 1]
+    assert "height<=" not in selector
+    assert selector.endswith("/bv*+ba/b")
+    assert args[args.index("--merge-output-format") + 1] == "mp4"
+
+
+def test_quality_options_do_not_touch_mp3() -> None:
+    assert "-f" not in download_args(request(quality_max=True, max_height=480))
+
+
+def test_sleep_settings_reach_yt_dlp() -> None:
+    args = download_args(request(sleep_min=1, sleep_max=2))
+    assert args[args.index("--sleep-interval") + 1] == "1"
+    assert args[args.index("--max-sleep-interval") + 1] == "2"
+
+
+def test_playlist_image_is_only_requested_when_needed() -> None:
+    assert "--no-write-playlist-metafiles" in download_args(request())
+    assert "--no-write-playlist-metafiles" not in download_args(request(playlist_cover=True))

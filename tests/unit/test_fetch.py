@@ -19,6 +19,7 @@ from ytb_playlist.backends.base import (
 from ytb_playlist.backends.ytdlp_proc import parse_line
 from ytb_playlist.core.fetch import FetchError, ItemsError, fetch, parse_items
 from ytb_playlist.core.models import (
+    CoverSource,
     Event,
     FailureKind,
     FetchDone,
@@ -481,6 +482,64 @@ def test_dry_run_leaves_a_crashed_file_alone(run: Run) -> None:
     (work.parent / "archive.txt").write_text("youtube a\n")
     run(FakeBackend(("a",)), dry_run=True)
     assert media.exists()
+
+
+def test_retry_failed_requests_permanent_failures_again(run: Run) -> None:
+    run(FakeBackend(outcomes={"b": [GONE]}))
+    backend = FakeBackend()
+    events = run(backend, retry_failed=True)
+    assert backend.requests[0].positions == (2,)
+    assert events[0] == FetchPlanned(run.folder, 1, 0)
+    assert load_state(run.folder).failures == {}
+    assert events[-1] == FetchDone(saved=1, failed=0, skipped=0)
+
+
+def test_retry_that_fails_again_stays_permanent(run: Run) -> None:
+    run(FakeBackend(("b",), {"b": [GONE]}))
+    events = run(FakeBackend(("b",), {"b": [GONE]}), retry_failed=True)
+    assert events[-1] == FetchDone(saved=0, failed=0, skipped=1)
+
+
+def test_quality_settings_reach_the_backend(run: Run) -> None:
+    backend = FakeBackend(("a",))
+    run(backend, max_height=720, quality_max=True, sleep_min=1, sleep_max=2)
+    request = backend.requests[0]
+    assert (request.max_height, request.quality_max) == (720, True)
+    assert (request.sleep_min, request.sleep_max) == (1, 2)
+
+
+class PlaylistImage(FakeBackend):
+    def download(self, request: DownloadRequest) -> Iterator[DownloadMessage]:
+        (request.work_dir / f"{PLAYLIST_ID}.jpg").write_bytes(b"playlist image")
+        (request.work_dir / f"{PLAYLIST_ID}.info.json").write_text("{}")
+        yield from super().download(request)
+
+
+def test_playlist_cover_is_used_for_every_track(run: Run) -> None:
+    backend = PlaylistImage(("a", "c"))
+    run(backend, cover=CoverSource.PLAYLIST)
+    assert backend.requests[0].playlist_cover
+    assert [name for _, _, name in run.tagged] == [f"{PLAYLIST_ID}.jpg"] * 2
+    thumbs = run.folder / ".ytb-playlist" / "thumbs"
+    assert (thumbs / f"{PLAYLIST_ID}.jpg").read_bytes() == b"playlist image"
+    assert not (run.folder / ".ytb-playlist" / "tmp").exists()
+
+
+def test_episode_cover_is_the_default(run: Run) -> None:
+    backend = FakeBackend(("a",))
+    run(backend)
+    assert not backend.requests[0].playlist_cover
+    assert run.tagged[0][2] == "a.jpg"
+
+
+def test_missing_playlist_image_falls_back_to_the_episode(run: Run) -> None:
+    run(FakeBackend(("a",)), cover=CoverSource.PLAYLIST)
+    assert run.tagged[0][2] == "a.jpg"
+
+
+def test_playlist_files_are_cleared_even_if_every_item_fails(run: Run) -> None:
+    run(PlaylistImage(("b",), {"b": [FLAKY]}), cover=CoverSource.PLAYLIST)
+    assert not (run.folder / ".ytb-playlist" / "tmp").exists()
 
 
 def test_clip_reaches_the_backend(run: Run) -> None:

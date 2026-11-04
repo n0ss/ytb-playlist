@@ -21,6 +21,11 @@ class DownloadRequest:
     format: MediaFormat
     positions: tuple[int, ...]
     clip_seconds: int | None
+    max_height: int = 1080
+    quality_max: bool = False
+    sleep_min: int = 3
+    sleep_max: int = 8
+    playlist_cover: bool = False
 
 
 @dataclass(frozen=True)

@@ -28,15 +28,7 @@ PROGRESS_TEMPLATE = (
     "%(progress.total_bytes)s|%(progress.total_bytes_estimate)s"
 )
 SAVED_TEMPLATE = "after_move:SAVED %(id)s|%(filepath)s"
-FORMAT_ARGS = {
-    MediaFormat.MP3: ["-x", "--audio-format", "mp3", "--audio-quality", "0"],
-    MediaFormat.MP4: [
-        "-f",
-        "bv*[vcodec^=avc1][height<=1080]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1][height<=1080]",
-        "--merge-output-format",
-        "mp4",
-    ],
-}
+MP3_ARGS = ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
 ERROR_LINE = re.compile(r"ERROR: (?:\[(?P<extractor>[^\]]+)\] (?P<id>[\w-]+): )?(?P<reason>.*)")
 ITEM_EXTRACTOR = "youtube"
 PERMANENT_ERRORS = (
@@ -109,9 +101,19 @@ def parse_playlist(text: str) -> PlaylistInfo:
         raise BackendError(f"unusable playlist listing: {error}") from error
 
 
+def _format_args(request: DownloadRequest) -> list[str]:
+    if request.format == MediaFormat.MP3:
+        return MP3_ARGS
+    height = "" if request.quality_max else f"[height<={request.max_height}]"
+    selector = f"bv*[vcodec^=avc1]{height}+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1]{height}"
+    if request.quality_max:
+        selector += "/bv*+ba/b"
+    return ["-f", selector, "--merge-output-format", "mp4"]
+
+
 def download_args(request: DownloadRequest) -> list[str]:
     args = [
-        *FORMAT_ARGS[request.format],
+        *_format_args(request),
         "--ignore-errors",
         "--newline",
         "--progress",
@@ -120,14 +122,13 @@ def download_args(request: DownloadRequest) -> list[str]:
         "--print",
         SAVED_TEMPLATE,
         "--write-info-json",
-        "--no-write-playlist-metafiles",
         "--write-thumbnail",
         "--convert-thumbnails",
         "jpg",
         "--sleep-interval",
-        "3",
+        str(request.sleep_min),
         "--max-sleep-interval",
-        "8",
+        str(request.sleep_max),
         "--download-archive",
         str(request.archive),
         "--playlist-items",
@@ -137,6 +138,8 @@ def download_args(request: DownloadRequest) -> list[str]:
         "-o",
         "%(id)s.%(ext)s",
     ]
+    if not request.playlist_cover:
+        args.append("--no-write-playlist-metafiles")
     if request.clip_seconds is not None:
         args += ["--download-sections", f"*0-{request.clip_seconds}"]
     return [*args, request.url]

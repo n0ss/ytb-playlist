@@ -12,7 +12,7 @@ from mutagen import MutagenError
 
 from ytb_playlist.cover import Cover, CoverError, square_cover, wide_cover
 from ytb_playlist.tagging.id3 import replace_id3_cover, write_id3
-from ytb_playlist.tagging.mapping import map_tags
+from ytb_playlist.tagging.mapping import DEFAULT_GENRE, map_tags
 from ytb_playlist.tagging.mp4 import replace_mp4_cover, write_mp4
 
 Tagger = Callable[[Path, Mapping[str, object], Path | None], tuple[str, ...]]
@@ -74,6 +74,8 @@ def tag_file(
     info: Mapping[str, object],
     thumbnail: Path | None,
     mode: CoverMode | None = None,
+    album: str | None = None,
+    genre: str = DEFAULT_GENRE,
 ) -> tuple[str, ...]:
     """Write every tag. A cover problem is a warning, because the tags still matter."""
     _require_supported(path)
@@ -90,7 +92,7 @@ def tag_file(
             data = cover.data
             if cover.over_budget:
                 warnings.append(f"cover of {path.name} is over the size budget")
-    tags = map_tags(info)
+    tags = map_tags(info, album, genre)
     write = WRITERS[path.suffix]
     try:
         _write_safely(path, lambda temp: write(temp, tags, data))

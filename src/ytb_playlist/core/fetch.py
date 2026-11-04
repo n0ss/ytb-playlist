@@ -20,6 +20,7 @@ from ytb_playlist.backends.base import (
     DownloadSaved,
 )
 from ytb_playlist.core.models import (
+    CoverSource,
     Event,
     Failure,
     FailureKind,
@@ -112,6 +113,7 @@ class _Run:
         folder: Path,
         state: PlaylistState,
         ext: str,
+        cover: CoverSource,
         tagger: Tagger,
         on_event: Callable[[Event], None],
         today: date,
@@ -121,6 +123,7 @@ class _Run:
         self.work = self.state_dir / WORK_DIR
         self.state = state
         self.ext = ext
+        self.cover = cover
         self.tagger = tagger
         self.on_event = on_event
         self.today = today.isoformat()
@@ -195,9 +198,8 @@ class _Run:
         self._tag(video_id, target, info)
 
     def _tag(self, video_id: str, target: Path, info: dict) -> None:
-        thumbnail = find_thumbnail(self.state_dir / THUMBNAIL_DIR, video_id)
         try:
-            warnings = self.tagger(target, info, thumbnail)
+            warnings = self.tagger(target, info, self._thumbnail(video_id))
         except TaggingError as error:
             self._fail(video_id, FailureKind.TEMPORARY, f"could not tag: {error}")
             return
@@ -205,6 +207,25 @@ class _Run:
         self.state.failures.pop(video_id, None)
         save_state(self.folder, self.state)
         self.on_event(ItemTagged(video_id, warnings))
+
+    def _thumbnail(self, video_id: str) -> Path | None:
+        """A playlist cover applies to every track; without one, the episode's own is used."""
+        thumbnails = self.state_dir / THUMBNAIL_DIR
+        if self.cover == CoverSource.PLAYLIST:
+            self.keep_playlist_image()
+            image = find_thumbnail(thumbnails, self.state.playlist_id)
+            if image is not None:
+                return image
+        return find_thumbnail(thumbnails, video_id)
+
+    def keep_playlist_image(self) -> None:
+        """Yt-dlp writes the playlist's files before any item, under the playlist ID."""
+        image = find_thumbnail(self.work, self.state.playlist_id)
+        if image is not None:
+            thumbnails = self.state_dir / THUMBNAIL_DIR
+            thumbnails.mkdir(exist_ok=True)
+            os.replace(image, thumbnails / image.name)
+        (self.work / f"{self.state.playlist_id}.info.json").unlink(missing_ok=True)
 
     def _move_into_place(self, video_id: str, media: Path) -> tuple[Path, dict]:
         if not is_safe_id(video_id) or media.parent.resolve() != self.work.resolve():
@@ -263,7 +284,7 @@ def fetch(
     state.require_format(options.format)
     selected = parse_items(options.items, info.item_count)
 
-    run = _Run(folder, state, options.format, tagger, on_event, today)
+    run = _Run(folder, state, options.format, options.cover, tagger, on_event, today)
     archive = run.state_dir / ARCHIVE_FILE
     archived = _read_archive(archive)
     if not options.dry_run:
@@ -271,7 +292,7 @@ def fetch(
         run.retry_untagged(archived)
 
     item_ids = set(info.item_ids)
-    skipped = state.permanent_failures()
+    skipped = set() if options.retry_failed else state.permanent_failures()
     positions = _pending(info, selected, archived | skipped)
     on_event(FetchPlanned(folder, len(positions), len(skipped & item_ids)))
     if options.dry_run:
@@ -281,11 +302,22 @@ def fetch(
         run.work.mkdir(parents=True, exist_ok=True)
         save_state(folder, state)
         request = DownloadRequest(
-            canonical, run.work, archive, options.format, positions, options.clip_seconds
+            canonical,
+            run.work,
+            archive,
+            options.format,
+            positions,
+            options.clip_seconds,
+            options.max_height,
+            options.quality_max,
+            options.sleep_min,
+            options.sleep_max,
+            options.cover == CoverSource.PLAYLIST,
         )
         with closing(backend.download(request)) as messages:
             for message in messages:
                 run.handle(message)
+        run.keep_playlist_image()
     run.remove_empty_work_folder()
     if run.playlist_errors:
         raise FetchError(run.playlist_errors[0])

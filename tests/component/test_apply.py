@@ -192,3 +192,10 @@ def test_relative_name_starting_with_a_dash_is_safe(
     monkeypatch.chdir(tmp_path)
     tag_file(Path(path.name), INFO, None)
     assert str(ID3(path)["TPE1"]) == "Radio Nova"
+
+
+def test_album_and_genre_overrides_reach_the_tags(media_file: Callable[[str], Path]) -> None:
+    path = media_file("mp3")
+    tag_file(path, INFO, None, album="My show", genre="Radio")
+    assert str(ID3(path)["TALB"]) == "My show"
+    assert str(ID3(path)["TCON"]) == "Radio"
