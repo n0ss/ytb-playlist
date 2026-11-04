@@ -22,6 +22,7 @@ from mutagen.mp3 import MP3
 
 from ytb_playlist.tagging.mapping import TrackTags
 
+LATIN1 = 0
 UTF16 = 1
 FRONT_COVER = 3
 TEXT_FRAMES = (
@@ -34,7 +35,8 @@ TEXT_FRAMES = (
 
 
 def _picture(cover: bytes) -> APIC:
-    return APIC(encoding=UTF16, mime="image/jpeg", type=FRONT_COVER, desc="", data=cover)
+    """Latin-1, not UTF-16: Music.app lists a UTF-16 picture frame but can't read its image."""
+    return APIC(encoding=LATIN1, mime="image/jpeg", type=FRONT_COVER, desc="", data=cover)
 
 
 def write_id3(path: Path, tags: TrackTags, cover: bytes | None) -> None:

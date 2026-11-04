@@ -161,3 +161,8 @@
 - **Decision:** the CLI reference is generated from Typer, and a test fails if it's stale. Tests also check that the config and exit-code pages list every setting and code. The spikes are removed, because decisions 18 to 21 keep their results and git history keeps the code. Fixtures use invented text, and the plan's byline is gone.
 - **Why:** the repository is public, so third-party text shouldn't stay in current files. The earlier versions remain in history, because removing them would mean rewriting public commits.
 - **Also:** the README states that the tool is for personal use and that YouTube's terms restrict downloading. That's a plain statement of the risk in decision 14, not legal advice.
+
+## 30. 2026-11-04 — MP3 cover frame encoding
+- **Decision:** write the `APIC` frame with Latin-1 text encoding and an empty description. All other text frames stay UTF-16.
+- **Why:** files carrying the same image behaved differently in Music.app. UTF-16 picture frames, in v2.3 and v2.4, showed no cover. Latin-1 frames did, including one written by ffmpeg. Finder and AVFoundation read both, which is why the fault was invisible outside Music.app. Tested on macOS 15.7.7 with Music 1.5.6.
+- **Open question:** decision 21 recorded covers as working with a UTF-16 frame, and that doesn't fit this result. Its cause isn't known.

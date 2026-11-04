@@ -1,6 +1,6 @@
 # Tags reference
 
-MP3 files get ID3v2.3 in UTF-16, with no ID3v1 tag. MP4 files get iTunes atoms. Tags from ffmpeg are replaced, and an empty value is left out.
+MP3 files get ID3v2.3 with no ID3v1 tag. Text frames use UTF-16. MP4 files get iTunes atoms. Tags from ffmpeg are replaced, and an empty value is left out.
 
 | Field | Source | MP3 frame | MP4 atom |
 | --- | --- | --- | --- |
@@ -23,6 +23,7 @@ Music.app shows only the year, which is why the full date is also in the title. 
 - MP3 uses `square`: a centre crop to the shorter side, capped at 1000×1000, never upscaled.
 - MP4 uses `wide`: the source size.
 - `tag` and `cover` accept `--cover square` or `--cover wide` to change the shape.
+- The MP3 cover frame uses Latin-1 for its label, unlike the other frames, because Music.app can't read a UTF-16 picture frame.
 - All covers are JPEG with no EXIF. Quality steps down from 90 to 75 until the image fits in 500 KB. If it still doesn't fit, it's kept at 75 with a warning.
 - The `cover = "playlist"` setting uses the playlist's image for every track, falling back to the episode's thumbnail if there isn't one.
 

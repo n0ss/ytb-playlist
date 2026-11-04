@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.1 (2026-11-04)
+- MP3 covers now show in Music.app: the picture frame uses Latin-1. See [decision 30](docs/tech-decisions.md).
+
 ## 0.1.0 (2026-11-04)
 - Project bootstrapped: full profile, Python 3.14 + uv + Typer CLI on the Homebrew yt-dlp, base skills only. See [decision 1](docs/tech-decisions.md).
 - Plan reviewed and moved to `docs/plan.md`. See decisions [2](docs/tech-decisions.md) to [14](docs/tech-decisions.md).

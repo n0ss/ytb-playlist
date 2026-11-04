@@ -7,7 +7,7 @@ import pytest
 from mutagen.id3 import ID3
 from mutagen.mp4 import MP4, MP4Cover
 
-from ytb_playlist.tagging.id3 import write_id3
+from ytb_playlist.tagging.id3 import replace_id3_cover, write_id3
 from ytb_playlist.tagging.mapping import TrackTags
 from ytb_playlist.tagging.mp4 import write_mp4
 
@@ -49,6 +49,22 @@ def test_id3_round_trip(media_file: Callable[[str], Path], jpeg: bytes) -> None:
     picture = tags.getall("APIC")[0]
     assert (picture.type, picture.mime, picture.data) == (3, "image/jpeg", jpeg)
     still_decodes(path)
+
+
+def test_id3_cover_uses_latin1_because_music_app_rejects_utf16(
+    media_file: Callable[[str], Path], jpeg: bytes
+) -> None:
+    path = media_file("mp3")
+    write_id3(path, TAGS, jpeg)
+    data = path.read_bytes()
+    assert data[data.index(b"APIC") + 10 :].startswith(b"\x00image/jpeg\x00\x03\x00\xff\xd8")
+
+
+def test_id3_cover_replacement_uses_latin1(media_file: Callable[[str], Path], jpeg: bytes) -> None:
+    path = media_file("mp3")
+    write_id3(path, TAGS, None)
+    replace_id3_cover(path, jpeg)
+    assert ID3(path, translate=False).getall("APIC")[0].encoding == 0
 
 
 def test_id3_is_version_2_3_without_id3v1(media_file: Callable[[str], Path], jpeg: bytes) -> None:
