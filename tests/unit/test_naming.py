@@ -26,6 +26,9 @@ def info(**fields: object) -> dict[str, object]:
         ("line\nbreak\ttab", "line break tab"),
         ("bell\x07 and null\x00", "bell and null"),
         ("../../etc/passwd", "- .. - etc - passwd"),
+        ("broken\ud83d surrogate", "broken surrogate"),
+        ("evil\u202egnp.exe", "evilgnp.exe"),
+        ("isolate\u2066d\u2069", "isolated"),
         ("???", "Untitled"),
         ('""', "Untitled"),
         ("...", "Untitled"),
@@ -39,6 +42,11 @@ def test_clean_title(title: str, expected: str) -> None:
 def test_clean_title_composes_accents() -> None:
     decomposed = unicodedata.normalize("NFD", "dernière")
     assert clean_title(decomposed) == "dernière"
+
+
+def test_clean_title_keeps_joined_emoji() -> None:
+    family = "\U0001f468\u200d\U0001f469"
+    assert clean_title(family) == family
 
 
 def test_clean_title_keeps_emoji_and_curly_quotes() -> None:
@@ -120,6 +128,15 @@ def test_folder_name_on_a_real_playlist() -> None:
     assert folder_name('Les intégrales de "La dernière"', PLAYLIST_ID) == (
         f"Les intégrales de La dernière [{PLAYLIST_ID}]"
     )
+
+
+def test_folder_name_without_a_title_is_untitled() -> None:
+    assert folder_name(None, PLAYLIST_ID) == f"Untitled [{PLAYLIST_ID}]"
+
+
+def test_name_with_a_surrogate_can_be_encoded() -> None:
+    name = file_name(info(title="a\ud83d"), "mp3")
+    assert name.encode() == f"2024-10-23 - a [{VIDEO_ID}].mp3".encode()
 
 
 def test_folder_name_cannot_be_hidden() -> None:
